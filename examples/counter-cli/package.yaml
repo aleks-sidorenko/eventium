@@ -2,17 +2,21 @@ name: examples-counter-cli
 version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: Example Counter cli application for eventium
-description: Example Counter cli application for eventium
+description: |
+  A simple counter application demonstrating basic event sourcing concepts with Eventium. This minimal
+  example is perfect for understanding the fundamentals of event sourcing, including command handling,
+  event storage, and aggregate state reconstruction. It uses in-memory storage for simplicity and serves
+  as an entry point for learning Eventium.
 stability: experimental
 license: MIT
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core
-  - eventium-memory
+  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-memory >= 0.1.0 && < 0.2.0
 
-  - safe
-  - stm
+  - safe >= 0.3 && < 0.4
+  - stm >= 2.5 && < 2.6
 
 executables:
   counter-cli:

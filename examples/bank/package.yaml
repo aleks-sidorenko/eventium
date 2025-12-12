@@ -2,32 +2,37 @@ name: examples-bank
 version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: Example bank application for eventium
-description: Example bank application for eventium
+description: |
+  A complete banking application example built with Eventium that demonstrates event sourcing patterns.
+  This example showcases account management with command handlers, customer operations, transfer process
+  managers, and read models for customer accounts. It provides a practical reference implementation for
+  building event-sourced applications with Eventium, including CLI interface, persistence with SQLite,
+  and comprehensive domain modeling.
 stability: experimental
 license: MIT
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core
-  - eventium-sqlite
+  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-sqlite >= 0.1.0 && < 0.2.0
 
-  - aeson
-  - aeson-pretty
-  - bytestring
-  - containers
-  - contravariant
-  - lens
-  - monad-logger
-  - mtl
-  - optparse-applicative
-  - persistent
-  - persistent-sqlite
-  - persistent-template
-  - safe
-  - stm
-  - x-sum-type-boilerplate
-  - template-haskell
-  - text
+  - aeson >= 1.5 && < 2.3
+  - aeson-pretty >= 0.8 && < 0.9
+  - bytestring >= 0.10 && < 0.13
+  - containers >= 0.6 && < 0.8
+  - contravariant >= 1.5 && < 1.6
+  - lens >= 4.19 && < 5.4
+  - monad-logger >= 0.3 && < 0.4
+  - mtl >= 2.2 && < 2.4
+  - optparse-applicative >= 0.15 && < 0.19
+  - persistent >= 2.13 && < 2.15
+  - persistent-sqlite >= 2.13 && < 2.14
+  - persistent-template >= 2.12 && < 2.13
+  - safe >= 0.3 && < 0.4
+  - stm >= 2.5 && < 2.6
+  - x-sum-type-boilerplate >= 0.1 && < 0.2
+  - template-haskell >= 2.16 && < 2.22
+  - text >= 1.2 && < 2.2
 
 library:
   source-dirs:
