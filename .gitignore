@@ -11,4 +11,4 @@ venv/
 doc/_build/
 database.db-*
 tags
-
+.envrc
