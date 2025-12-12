@@ -110,23 +110,6 @@ cabal build examples-counter-cli
 cabal run counter-cli
 ```
 
-## Recent Changes (v0.1.0)
-
-### 🔄 Migration from Eventful to Eventium
-- **Package Rename**: All modules migrated from `eventful-*` to `eventium-*`
-- **Dependency Updates**: Updated internal dependencies to use new naming
-- **Version Alignment**: All modules now use consistent version 0.1.0
-
-### 🛠️ Template Haskell Restoration
-- **GHC 9.6.7 Compatibility**: Fixed Template Haskell support with `x-sum-type-boilerplate`
-- **Working Code Generation**: Restored `mkSumTypeSerializer` and `mkProjection` functions
-- **Type Safety**: Automatic boilerplate generation reduces errors
-
-### 🏗️ Build System Improvements
-- **Nix Integration**: Full Nix flake support for reproducible environments
-- **Cabal Integration**: Modern Cabal workflow with package.yaml
-- **Automated Testing**: Comprehensive test scripts and CI setup
-
 ## Getting Started
 
 1. **Clone the repository**:
@@ -155,8 +138,7 @@ cabal run counter-cli
    ```
 
 ## Documentation
-
-- **[Migration Notes](MIGRATION-NOTES.md)** - Details on the eventful → eventium migration
+- **[Design](DESIGN.md)** - Design summary and main concepts
 - **[Changelog](CHANGELOG.md)** - Complete version history
 - **[Examples](examples/)** - Working example applications
 
