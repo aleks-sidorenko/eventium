@@ -2,7 +2,11 @@ name: eventium-memory
 version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: In-memory implementations for eventium
-description: In-memory implementations for eventium
+description: |
+  Eventium-memory provides in-memory implementations of event stores, read models, and projection caches
+  for the Eventium event sourcing framework. This package is ideal for development, testing, and prototyping
+  event-sourced applications without requiring external dependencies like databases. All data is stored in
+  STM-based concurrent data structures for thread-safe access.
 stability: experimental
 category: Database,Eventsourcing
 license: MIT
@@ -16,12 +20,11 @@ extra-source-files:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core
-
-  - containers
-  - mtl
-  - safe
-  - stm
+  - eventium-core >= 0.1.0 && < 0.2.0
+  - containers >= 0.6 && < 0.8
+  - mtl >= 2.2 && < 2.4
+  - safe >= 0.3 && < 0.4
+  - stm >= 2.5 && < 2.6
 
 library:
   source-dirs:

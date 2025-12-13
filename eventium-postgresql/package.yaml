@@ -2,7 +2,11 @@ name: eventium-postgresql
 version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: Postgres implementations for eventium
-description: Postgres implementations for eventium
+description: |
+  Eventium-postgresql provides a PostgreSQL-based event store implementation for the Eventium event
+  sourcing framework. It uses the Persistent library for type-safe database access and provides
+  efficient event storage and retrieval with support for aggregate streams, event versioning, and
+  optimistic concurrency control. This is a production-ready backend for event-sourced applications.
 stability: experimental
 category: Database,Eventsourcing,PostgreSQL
 license: MIT
@@ -16,14 +20,14 @@ extra-source-files:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core
-  - eventium-sql-common
+  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-sql-common >= 0.1.0 && < 0.2.0
 
-  - aeson
-  - bytestring
-  - mtl
-  - persistent
-  - text
+  - aeson >= 1.5 && < 2.3
+  - bytestring >= 0.10 && < 0.13
+  - mtl >= 2.2 && < 2.4
+  - persistent >= 2.13 && < 2.15
+  - text >= 1.2 && < 2.2
 
 library:
   source-dirs:

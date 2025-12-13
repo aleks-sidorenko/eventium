@@ -2,32 +2,36 @@ name: examples-cafe
 version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: Example cafe application for eventium
-description: Example cafe application for eventium
+description: |
+  A cafe ordering system example built with Eventium, inspired by Edument's CQRS tutorial. This example
+  demonstrates event-driven workflow patterns including order management, chef todo lists, and event-based
+  coordination. It showcases both in-memory and persistent storage options, command-line interface design,
+  and practical patterns for building event-sourced applications with complex workflows and multiple read models.
 stability: experimental
 license: MIT
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core
-  - eventium-memory
-  - eventium-sqlite
+  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-memory >= 0.1.0 && < 0.2.0
+  - eventium-sqlite >= 0.1.0 && < 0.2.0
 
-  - aeson
-  - aeson-casing
-  - aeson-pretty
-  - ansi-terminal
-  - bytestring
-  - containers
-  - lens
-  - monad-logger
-  - mtl
-  - optparse-applicative
-  - persistent
-  - persistent-sqlite
-  - persistent-template
-  - safe
-  - stm
-  - text
+  - aeson >= 1.5 && < 2.3
+  - aeson-casing >= 0.2 && < 0.3
+  - aeson-pretty >= 0.8 && < 0.9
+  - ansi-terminal >= 0.11 && < 1.2
+  - bytestring >= 0.10 && < 0.13
+  - containers >= 0.6 && < 0.8
+  - lens >= 4.19 && < 5.4
+  - monad-logger >= 0.3 && < 0.4
+  - mtl >= 2.2 && < 2.4
+  - optparse-applicative >= 0.15 && < 0.19
+  - persistent >= 2.13 && < 2.15
+  - persistent-sqlite >= 2.13 && < 2.14
+  - persistent-template >= 2.12 && < 2.13
+  - safe >= 0.3 && < 0.4
+  - stm >= 2.5 && < 2.6
+  - text >= 1.2 && < 2.2
 
 library:
   source-dirs:

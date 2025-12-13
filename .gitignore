@@ -10,4 +10,5 @@ database.db
 venv/
 doc/_build/
 database.db-*
-
+tags
+*.local
