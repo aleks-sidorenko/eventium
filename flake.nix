@@ -21,7 +21,7 @@
           "eventium-postgresql"
           "eventium-sql-common"
           "eventium-sqlite"
-          "eventium-test-helpers"          
+          "eventium-testkit"
           "examples/bank"
           "examples/cafe"
           "examples/counter-cli"
@@ -56,6 +56,7 @@
           hPkgs.ormolu
           hPkgs.ghcid
           hPkgs.hspec-discover
+          just
           
           # System dependencies
           pkg-config
@@ -85,39 +86,10 @@
         devShells.default = pkgs.mkShell {
           buildInputs = devDependencies;
           
-          # Set up environment for development
           shellHook = ''
-            echo "🎯 Eventful Development Environment"
-            echo "📦 GHC version: $(ghc --version)"
-            echo "🔧 Available commands:"
-            echo "  • cabal build          - Build all packages"
-            echo "  • cabal test           - Run all tests"
-            echo "  • hpack                - Generate cabal files from package.yaml"
-            echo "  • ghcid                - Continuous compilation"
+            just hpack
             echo ""
-            echo "🗄️  Database libraries available:"
-            echo "  • libpq (from postgresql.lib)"
-            echo "  • sqlite3"
-            echo ""
-            
-            # Generate cabal files from package.yaml files
-            echo "📝 Generating cabal files from package.yaml..."
-            find . -name package.yaml -exec dirname {} \; | while read dir; do
-              echo "  → $dir"
-              (cd "$dir" && hpack)
-            done
-            echo "✅ Cabal files generated"
-
-            # Optionally start a local PostgreSQL if running inside a container/CI
-            if [ "''${IN_CONTAINER:-}" = "1" ]; then
-              export POSTGRES_HOST=''${POSTGRES_HOST:-127.0.0.1}
-              export POSTGRES_PORT=''${POSTGRES_PORT:-5432}
-              export POSTGRES_USER=''${POSTGRES_USER:-postgres}
-              export POSTGRES_PASSWORD=''${POSTGRES_PASSWORD:-password}
-              export POSTGRES_DBNAME=''${POSTGRES_DBNAME:-eventium_test}
-              echo "Ensuring local PostgreSQL is running (IN_CONTAINER=1)..."
-              bash scripts/start-postgres.sh || true
-            fi
+            just --list
           '';
 
           # Environment variables

@@ -4,7 +4,7 @@ module Eventium.Store.SqliteSpec (spec) where
 
 import Database.Persist.Sqlite
 import Eventium.Store.Sqlite
-import Eventium.TestHelpers
+import Eventium.Testkit
 import Test.Hspec
 
 spec :: Spec
@@ -22,8 +22,8 @@ spec = do
 makeStore :: IO (VersionedEventStoreWriter (SqlPersistT IO) CounterEvent, VersionedEventStoreReader (SqlPersistT IO) CounterEvent, ConnectionPool)
 makeStore = do
   pool <- liftIO $ runNoLoggingT (createSqlitePool ":memory:" 1)
-  let writer = serializedEventStoreWriter jsonStringSerializer $ sqliteEventStoreWriter defaultSqlEventStoreConfig
-      reader = serializedVersionedEventStoreReader jsonStringSerializer $ sqlEventStoreReader defaultSqlEventStoreConfig
+  let writer = codecEventStoreWriter jsonStringCodec $ sqliteEventStoreWriter defaultSqlEventStoreConfig
+      reader = codecVersionedEventStoreReader jsonStringCodec $ sqlEventStoreReader defaultSqlEventStoreConfig
   initializeSqliteEventStore defaultSqlEventStoreConfig pool
   return (writer, reader, pool)
 
@@ -35,7 +35,7 @@ sqliteStoreRunner = EventStoreRunner $ \action -> do
 sqliteStoreGlobalRunner :: GlobalStreamEventStoreRunner (SqlPersistT IO)
 sqliteStoreGlobalRunner = GlobalStreamEventStoreRunner $ \action -> do
   (writer, _, pool) <- makeStore
-  let globalStore = serializedGlobalEventStoreReader jsonStringSerializer (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
+  let globalStore = codecGlobalEventStoreReader jsonStringCodec (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
   runSqlPool (action writer globalStore) pool
 
 makeIOStore :: IO (VersionedEventStoreWriter IO CounterEvent, VersionedEventStoreReader IO CounterEvent, ConnectionPool)
@@ -53,6 +53,6 @@ sqliteIOStoreRunner = EventStoreRunner $ \action -> do
 sqliteIOStoreGlobalRunner :: GlobalStreamEventStoreRunner IO
 sqliteIOStoreGlobalRunner = GlobalStreamEventStoreRunner $ \action -> do
   (writer, _, pool) <- makeIOStore
-  let globalStore = serializedGlobalEventStoreReader jsonStringSerializer (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
+  let globalStore = codecGlobalEventStoreReader jsonStringCodec (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
       globalStore' = runEventStoreReaderUsing (`runSqlPool` pool) globalStore
   action writer globalStore'

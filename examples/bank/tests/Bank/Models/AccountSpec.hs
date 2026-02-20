@@ -2,6 +2,7 @@ module Bank.Models.AccountSpec (spec) where
 
 import Bank.Models.Account
 import Eventium
+import Eventium.Testkit (allCommandHandlerStates)
 import Test.Hspec
 
 spec :: Spec
@@ -23,7 +24,6 @@ spec = do
 
     it "should handle successful account transfers" $ do
       let transferUuid = read "754d7bd9-fd0b-4006-b33a-f41fd5c3ca5e" :: UUID
-          -- sourceAccount = read "afee3d24-df9b-4069-be0e-80bf0ba4f662" :: UUID
           targetAccount = read "44e9fd39-0179-4050-8706-d5a1d2c6d093" :: UUID
           events =
             [ AccountOpenedAccountEvent $ AccountOpened nil 10,
@@ -39,8 +39,8 @@ spec = do
       let stateAfterStarted = latestProjection accountProjection events
 
       accountAvailableBalance stateAfterStarted `shouldBe` 4
-      commandHandlerHandler accountCommandHandler stateAfterStarted (DebitAccountAccountCommand (DebitAccount 9 "blah"))
-        `shouldBe` [AccountDebitRejectedAccountEvent $ AccountDebitRejected 4]
+      commandHandlerDecide accountCommandHandler stateAfterStarted (DebitAccountAccountCommand (DebitAccount 9 "blah"))
+        `shouldBe` Left (InsufficientFunds 4)
 
       let events' = events ++ [AccountTransferCompletedAccountEvent $ AccountTransferCompleted transferUuid]
           completedState = latestProjection accountProjection events'

@@ -13,7 +13,6 @@ license: MIT
 dependencies:
   - base >= 4.9 && < 5
   - eventium-core >= 0.1.0 && < 0.2.0
-  - eventium-memory >= 0.1.0 && < 0.2.0
   - eventium-sqlite >= 0.1.0 && < 0.2.0
 
   - aeson >= 1.5 && < 2.3
@@ -30,7 +29,6 @@ dependencies:
   - persistent-sqlite >= 2.13 && < 2.14
   - persistent-template >= 2.12 && < 2.13
   - safe >= 0.3 && < 0.4
-  - stm >= 2.5 && < 2.6
   - text >= 1.2 && < 2.2
 
 library:

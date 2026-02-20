@@ -3,16 +3,16 @@
 
 module Eventium.Store.Sql.JSONString
   ( JSONString,
-    jsonStringSerializer,
+    jsonStringCodec,
   )
 where
 
-import Data.Aeson
+import qualified Data.Aeson as Aeson
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.Encoding as TLE
 import Database.Persist
 import Database.Persist.Sql
-import Eventium.Serializer
+import Eventium.Codec (Codec (..))
 
 -- | A more specific type than just ByteString for JSON data.
 newtype JSONString = JSONString {unJSONString :: Text}
@@ -24,18 +24,14 @@ instance PersistFieldSql JSONString where
 instance Show JSONString where
   show = show . unJSONString
 
-jsonStringSerializer :: (ToJSON a, FromJSON a) => Serializer a JSONString
-jsonStringSerializer =
-  Serializer
+jsonStringCodec :: (Aeson.ToJSON a, Aeson.FromJSON a) => Codec a JSONString
+jsonStringCodec =
+  Codec
     encodeJSON
     decodeJSON
-    decodeJSONEither
 
-encodeJSON :: (ToJSON a) => a -> JSONString
-encodeJSON = JSONString . TLE.decodeUtf8 . encode
+encodeJSON :: (Aeson.ToJSON a) => a -> JSONString
+encodeJSON = JSONString . TLE.decodeUtf8 . Aeson.encode
 
-decodeJSON :: (FromJSON a) => JSONString -> Maybe a
-decodeJSON = decode . TLE.encodeUtf8 . unJSONString
-
-decodeJSONEither :: (FromJSON a) => JSONString -> Either String a
-decodeJSONEither = eitherDecode . TLE.encodeUtf8 . unJSONString
+decodeJSON :: (Aeson.FromJSON a) => JSONString -> Maybe a
+decodeJSON = Aeson.decode . TLE.encodeUtf8 . unJSONString

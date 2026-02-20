@@ -6,7 +6,7 @@ module Eventium.ProjectionCache.Types
     VersionedProjectionCache,
     GlobalStreamProjectionCache,
     runProjectionCacheUsing,
-    serializedProjectionCache,
+    codecProjectionCache,
     getLatestVersionedProjectionWithCache,
     getLatestGlobalProjectionWithCache,
     updateProjectionCache,
@@ -14,14 +14,14 @@ module Eventium.ProjectionCache.Types
   )
 where
 
+import Eventium.Codec
 import Eventium.Projection
-import Eventium.Serializer
 import Eventium.Store.Class
 import Eventium.UUID
 
 -- | A 'ProjectionCache' caches snapshots of 'Projection's in event streams.
 -- This is useful if your event streams are very large. This cache operates on
--- some 'Monad' @m@ and stores the 'Projection' state of type @serialized@.
+-- some 'Monad' @m@ and stores the 'Projection' state of type @encoded@.
 --
 -- At its core, this is essentially just a key-value store with knowledge of
 -- the stream 'UUID' and 'EventVersion'. It is recommended to use the other
@@ -31,52 +31,52 @@ import Eventium.UUID
 -- The @key@ and @position@ type parameters are polymorphic so we can abstract
 -- over a cache for individual event streams, and a cache for globally ordered
 -- streams.
-data ProjectionCache key position serialized m
+data ProjectionCache key position encoded m
   = ProjectionCache
   { -- | Stores the state for a projection at a given @key@ and @position@.
     -- This is pretty unsafe, because there is no guarantee what is stored is
     -- actually derived from the events in the stream. Consider using
     -- 'updateProjectionCache'.
-    storeProjectionSnapshot :: key -> position -> serialized -> m (),
+    storeProjectionSnapshot :: key -> position -> encoded -> m (),
     -- | Loads the latest projection state from the cache.
-    loadProjectionSnapshot :: key -> m (Maybe (position, serialized))
+    loadProjectionSnapshot :: key -> m (Maybe (position, encoded))
   }
 
 -- | Type synonym for a 'ProjectionCache' used on individual event streams.
-type VersionedProjectionCache serialized m = ProjectionCache UUID EventVersion serialized m
+type VersionedProjectionCache encoded m = ProjectionCache UUID EventVersion encoded m
 
 -- | Type synonym for a 'ProjectionCache' that is used in conjunction with a
 -- 'GlobalStreamEventStore'.
-type GlobalStreamProjectionCache key serialized m = ProjectionCache key SequenceNumber serialized m
+type GlobalStreamProjectionCache key encoded m = ProjectionCache key SequenceNumber encoded m
 
 -- | Changes the monad a 'ProjectionCache' runs in. This is useful to run the
 -- cache in another 'Monad' while forgetting the original 'Monad'.
 runProjectionCacheUsing ::
   (Monad m, Monad mstore) =>
   (forall a. mstore a -> m a) ->
-  ProjectionCache key position serialized mstore ->
-  ProjectionCache key position serialized m
+  ProjectionCache key position encoded mstore ->
+  ProjectionCache key position encoded m
 runProjectionCacheUsing runCache ProjectionCache {..} =
   ProjectionCache
     { storeProjectionSnapshot = \uuid version state -> runCache $ storeProjectionSnapshot uuid version state,
       loadProjectionSnapshot = runCache . loadProjectionSnapshot
     }
 
--- | Wraps a 'ProjectionCache' and transparently serializes/deserializes events for
--- you. Note that in this implementation deserialization errors when using
+-- | Wraps a 'ProjectionCache' and transparently encodes/decodes events for
+-- you. Note that in this implementation decoding errors when using
 -- 'getEvents' are simply ignored (the event is not returned).
-serializedProjectionCache ::
+codecProjectionCache ::
   (Monad m) =>
-  Serializer state serialized ->
-  ProjectionCache key position serialized m ->
+  Codec state encoded ->
+  ProjectionCache key position encoded m ->
   ProjectionCache key position state m
-serializedProjectionCache Serializer {..} ProjectionCache {..} =
+codecProjectionCache codec ProjectionCache {..} =
   ProjectionCache storeProjectionSnapshot' loadProjectionSnapshot'
   where
-    storeProjectionSnapshot' uuid version = storeProjectionSnapshot uuid version . serialize
+    storeProjectionSnapshot' uuid version = storeProjectionSnapshot uuid version . encode codec
     loadProjectionSnapshot' uuid = do
       mState <- loadProjectionSnapshot uuid
-      return $ mState >>= traverse deserialize
+      return $ mState >>= traverse (decode codec)
 
 -- | Like 'getLatestVersionedProjection', but uses a 'ProjectionCache' if it contains
 -- more recent state.

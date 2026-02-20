@@ -3,7 +3,7 @@ version: "0.1.0"
 maintainer: Alexander Sidorenko
 synopsis: In-memory implementations for eventium
 description: |
-  Eventium-memory provides in-memory implementations of event stores, read models, and projection caches
+  Eventium-memory provides in-memory implementations of event stores and projection caches
   for the Eventium event sourcing framework. This package is ideal for development, testing, and prototyping
   event-sourced applications without requiring external dependencies like databases. All data is stored in
   STM-based concurrent data structures for thread-safe access.
@@ -41,6 +41,6 @@ tests:
     dependencies:
       - hspec
       - HUnit
-      - eventium-test-helpers
+      - eventium-testkit
     build-tools:
       - hspec-discover

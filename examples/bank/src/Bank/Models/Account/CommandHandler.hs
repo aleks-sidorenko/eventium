@@ -4,6 +4,7 @@
 module Bank.Models.Account.CommandHandler
   ( accountCommandHandler,
     AccountCommand (..),
+    AccountCommandError (..),
   )
 where
 
@@ -17,58 +18,86 @@ import SumTypesX.TH
 
 constructSumType "AccountCommand" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) accountCommands
 
-handleAccountCommand :: Account -> AccountCommand -> [AccountEvent]
+-- | Errors returned by the account command handler when a command is rejected.
+data AccountCommandError
+  = AccountAlreadyOpen
+  | InvalidInitialDeposit
+  | InsufficientFunds Double
+  | AccountNotOpen
+  deriving (Show, Eq)
+
+handleAccountCommand :: Account -> AccountCommand -> Either AccountCommandError [AccountEvent]
 handleAccountCommand account (OpenAccountAccountCommand OpenAccount {..}) =
   case account ^. accountOwner of
-    Just _ -> [AccountOpenRejectedAccountEvent $ AccountOpenRejected "Account already open"]
+    Just _ -> Left AccountAlreadyOpen
     Nothing ->
       if openAccountInitialFunding < 0
-        then [AccountOpenRejectedAccountEvent $ AccountOpenRejected "Invalid initial deposit"]
+        then Left InvalidInitialDeposit
         else
-          [ AccountOpenedAccountEvent
-              AccountOpened
-                { accountOpenedOwner = openAccountOwner,
-                  accountOpenedInitialFunding = openAccountInitialFunding
-                }
-          ]
+          Right
+            [ AccountOpenedAccountEvent
+                AccountOpened
+                  { accountOpenedOwner = openAccountOwner,
+                    accountOpenedInitialFunding = openAccountInitialFunding
+                  }
+            ]
 handleAccountCommand _ (CreditAccountAccountCommand CreditAccount {..}) =
-  [ AccountCreditedAccountEvent
-      AccountCredited
-        { accountCreditedAmount = creditAccountAmount,
-          accountCreditedReason = creditAccountReason
-        }
-  ]
+  Right
+    [ AccountCreditedAccountEvent
+        AccountCredited
+          { accountCreditedAmount = creditAccountAmount,
+            accountCreditedReason = creditAccountReason
+          }
+    ]
 handleAccountCommand account (DebitAccountAccountCommand DebitAccount {..}) =
   if accountAvailableBalance account - debitAccountAmount < 0
-    then [AccountDebitRejectedAccountEvent $ AccountDebitRejected $ accountAvailableBalance account]
+    then Left $ InsufficientFunds $ accountAvailableBalance account
     else
-      [ AccountDebitedAccountEvent
-          AccountDebited
-            { accountDebitedAmount = debitAccountAmount,
-              accountDebitedReason = debitAccountReason
-            }
-      ]
+      Right
+        [ AccountDebitedAccountEvent
+            AccountDebited
+              { accountDebitedAmount = debitAccountAmount,
+                accountDebitedReason = debitAccountReason
+              }
+        ]
 handleAccountCommand account (TransferToAccountAccountCommand TransferToAccount {..})
   | isNothing (account ^. accountOwner) =
-      [AccountTransferRejectedAccountEvent $ AccountTransferRejected transferToAccountTransferId "Account doesn't exist"]
+      Left AccountNotOpen
   | accountAvailableBalance account - transferToAccountAmount < 0 =
-      [AccountTransferRejectedAccountEvent $ AccountTransferRejected transferToAccountTransferId "Not enough funds"]
+      Left $ InsufficientFunds $ accountAvailableBalance account
   | otherwise =
-      [ AccountTransferStartedAccountEvent
-          AccountTransferStarted
-            { accountTransferStartedTransferId = transferToAccountTransferId,
-              accountTransferStartedAmount = transferToAccountAmount,
-              accountTransferStartedTargetAccount = transferToAccountTargetAccount
-            }
-      ]
+      Right
+        [ AccountTransferStartedAccountEvent
+            AccountTransferStarted
+              { accountTransferStartedTransferId = transferToAccountTransferId,
+                accountTransferStartedAmount = transferToAccountAmount,
+                accountTransferStartedTargetAccount = transferToAccountTargetAccount
+              }
+        ]
 handleAccountCommand _ (AcceptTransferAccountCommand AcceptTransfer {..}) =
-  [ AccountCreditedFromTransferAccountEvent
-      AccountCreditedFromTransfer
-        { accountCreditedFromTransferTransferId = acceptTransferTransferId,
-          accountCreditedFromTransferSourceAccount = acceptTransferSourceAccount,
-          accountCreditedFromTransferAmount = acceptTransferAmount
-        }
-  ]
+  Right
+    [ AccountCreditedFromTransferAccountEvent
+        AccountCreditedFromTransfer
+          { accountCreditedFromTransferTransferId = acceptTransferTransferId,
+            accountCreditedFromTransferSourceAccount = acceptTransferSourceAccount,
+            accountCreditedFromTransferAmount = acceptTransferAmount
+          }
+    ]
+handleAccountCommand _ (CompleteTransferAccountCommand CompleteTransfer {..}) =
+  Right
+    [ AccountTransferCompletedAccountEvent
+        AccountTransferCompleted
+          { accountTransferCompletedTransferId = completeTransferTransferId
+          }
+    ]
+handleAccountCommand _ (RejectTransferAccountCommand RejectTransfer {..}) =
+  Right
+    [ AccountTransferFailedAccountEvent
+        AccountTransferFailed
+          { accountTransferFailedTransferId = rejectTransferTransferId,
+            accountTransferFailedReason = rejectTransferReason
+          }
+    ]
 
-accountCommandHandler :: CommandHandler Account AccountEvent AccountCommand
+accountCommandHandler :: CommandHandler Account AccountEvent AccountCommand AccountCommandError
 accountCommandHandler = CommandHandler handleAccountCommand accountProjection

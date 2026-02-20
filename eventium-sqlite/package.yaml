@@ -46,7 +46,7 @@ tests:
     dependencies:
       - hspec
       - HUnit
-      - eventium-test-helpers
+      - eventium-testkit
       - persistent-sqlite
     build-tools:
       - hspec-discover

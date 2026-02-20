@@ -1,42 +1,27 @@
 # Eventium PostgreSQL
 
-PostgreSQL-based event store implementation for production event sourcing systems.
+PostgreSQL event store backend for Eventium.
 
 ## Overview
 
-`eventium-postgresql` provides a robust, production-ready event store implementation backed by PostgreSQL. It leverages PostgreSQL's ACID guarantees, indexing capabilities, and reliability for persistent event storage with high performance and data integrity.
+`eventium-postgresql` provides a production-grade event store backed by PostgreSQL.
+It uses the `persistent` library for type-safe database access and guarantees
+monotonically increasing global sequence numbers via `LOCK IN EXCLUSIVE MODE`.
 
-## Features
+## API
 
-- ✅ **ACID Transactions** - Full consistency guarantees
-- ✅ **Optimistic Concurrency** - Prevents lost updates with version checks
-- ✅ **Efficient Indexing** - Fast event retrieval by stream and position
-- ✅ **Global Event Ordering** - Sequence numbers for time-ordered queries
-- ✅ **Type-Safe Access** - Uses Persistent library for database operations
-- ✅ **Production Ready** - Battle-tested PostgreSQL backend
-- ✅ **Multi-Process Support** - Concurrent access from multiple applications
+```haskell
+postgresqlEventStoreWriter
+  :: (MonadIO m)
+  => SqlEventStoreConfig entity serialized
+  -> VersionedEventStoreWriter (SqlPersistT m) serialized
+```
 
-## Database Schema
+Readers come from `eventium-sql-common` (re-exported):
 
-The implementation creates two main tables:
-- **Events Table** - Stores events with aggregate keys, versions, and payloads
-- **Global Events Table** - Maintains global ordering with sequence numbers
-
-Indexes ensure fast lookups by:
-- Stream key + version
-- Global sequence number
-- Event types (for projections)
-
-## Installation
-
-Add to your `package.yaml`:
-
-```yaml
-dependencies:
-  - eventium-core
-  - eventium-sql-common
-  - eventium-postgresql
-  - persistent-postgresql  # PostgreSQL driver
+```haskell
+sqlEventStoreReader       :: SqlEventStoreConfig entity serialized -> VersionedEventStoreReader (SqlPersistT m) serialized
+sqlGlobalEventStoreReader :: SqlEventStoreConfig entity serialized -> GlobalEventStoreReader (SqlPersistT m) serialized
 ```
 
 ## Usage
@@ -46,120 +31,49 @@ import Eventium.Store.Postgresql
 import Database.Persist.Postgresql
 
 main :: IO ()
-main = do
-  let connStr = "host=localhost dbname=eventstore user=postgres"
-  
+main = runStdoutLoggingT $
   withPostgresqlPool connStr 10 $ \pool -> do
-    -- Initialize schema
+    -- Use defaultSqlEventStoreConfig for the standard schema
+    let writer = postgresqlEventStoreWriter defaultSqlEventStoreConfig
+        reader = sqlEventStoreReader defaultSqlEventStoreConfig
     flip runSqlPool pool $ do
-      runMigration migrateAll
-      
-      -- Create event store
-      let store = makePostgresqlEventStore pool
-      
-      -- Use with command handlers
-      result <- applyCommandHandler 
-        (eventStoreWriter store)
-        (eventStoreReader store)
-        commandHandler
-        aggregateId
-        command
-```
-
-## Configuration
-
-### Connection String
-
-```haskell
--- Basic connection
-"host=localhost port=5432 dbname=mydb user=myuser password=mypass"
-
--- With connection pool
-withPostgresqlPool connectionString poolSize $ \pool -> ...
-```
-
-### Connection Pooling
-
-Recommended settings for production:
-```haskell
--- Pool size based on concurrent requests
-poolSize = numCores * 2 + effectiveSpindleCount
-
--- Example: 10 connections for typical web app
-withPostgresqlPool connStr 10 $ \pool -> ...
+      runMigration migrateSqlEvent
+      -- writer and reader are ready to use
 ```
 
 ## Setup
 
-### Start PostgreSQL with Docker
-
 ```bash
-# Using docker-compose (provided in project root)
-docker-compose up -d postgres
+# Start PostgreSQL with docker-compose (from project root)
+docker compose up -d
 
-# Or manually
-docker run -d \
-  --name eventium-postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=eventstore \
-  -p 5432:5432 \
-  postgres:15
+# Default connection settings (matching docker-compose.yaml):
+# POSTGRES_HOST=127.0.0.1  POSTGRES_PORT=5432
+# POSTGRES_USER=postgres   POSTGRES_PASSWORD=password
+# POSTGRES_DBNAME=eventium_test
 ```
 
-### Run Migrations
+## Concurrency
 
-```haskell
-runSqlPool (runMigration migrateAll) pool
-```
+PostgreSQL uses `LOCK table_name IN EXCLUSIVE MODE` during writes. This ensures
+that auto-increment IDs are assigned in commit order, so concurrent readers
+always see a gapless, monotonically increasing global sequence.
 
-## Performance
+## Installation
 
-PostgreSQL provides excellent performance characteristics:
-- **Writes**: ~1000-5000 events/sec (single connection)
-- **Reads**: ~10000-50000 events/sec (with proper indexing)
-- **Scalability**: Read replicas for query scaling
-
-See `postgres-event-store-bench/` for benchmarking scripts.
-
-## Best Practices
-
-1. **Use Connection Pooling** - Essential for web applications
-2. **Index Strategy** - Default indexes cover common queries
-3. **Backup Strategy** - Regular PostgreSQL backups
-4. **Monitoring** - Watch connection pool usage and query performance
-5. **Read Replicas** - Scale read models with PostgreSQL replication
-
-## Production Considerations
-
-- **High Availability** - Use PostgreSQL replication
-- **Backup & Recovery** - Point-in-time recovery with WAL archiving
-- **Monitoring** - Track event growth and query performance
-- **Connection Limits** - Configure max_connections appropriately
-
-## Example: Complete Setup
-
-```haskell
-import Eventium.Store.Postgresql
-import Control.Monad.Logger (runStdoutLoggingT)
-
-setupEventStore :: IO ()
-setupEventStore = runStdoutLoggingT $ do
-  let connStr = "host=localhost dbname=eventstore"
-  
-  withPostgresqlPool connStr 10 $ \pool -> do
-    -- Run migrations
-    flip runSqlPool pool $ runMigration migrateAll
-    
-    -- Event store is ready to use
-    liftIO $ putStrLn "Event store initialized"
+```yaml
+dependencies:
+  - eventium-core
+  - eventium-postgresql
+  - persistent-postgresql
 ```
 
 ## Documentation
 
-- [Main README](../README.md) - Project overview
-- [SQL Common](../eventium-sql-common/) - Shared SQL utilities
-- [Design Documentation](../DESIGN.md) - Architecture details
+- [Main README](../README.md)
+- [SQL Common](../eventium-sql-common/)
+- [Design](../DESIGN.md)
 
 ## License
 
-MIT - see [LICENSE.md](LICENSE.md)
+MIT -- see [LICENSE.md](LICENSE.md)

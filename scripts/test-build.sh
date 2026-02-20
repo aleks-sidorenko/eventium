@@ -20,7 +20,7 @@ nix develop --command bash << 'EOF'
   
   echo "🧪 Running tests..."
   echo "Testing core packages:"
-  cabal test eventium-core eventium-memory eventium-test-helpers
+  cabal test eventium-core eventium-memory eventium-testkit
   echo ""
   
   echo "Testing examples:"  

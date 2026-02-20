@@ -1,60 +1,55 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE RecordWildCards #-}
-
+-- | Defines a Process Manager (saga) abstraction for orchestrating
+-- interactions across multiple event streams.
+--
+-- A 'ProcessManager' is the combination of a 'Projection' (to track state
+-- across streams) and a pure @react@ function that decides what commands to
+-- issue in response to each event. Commands are represented as
+-- 'ProcessManagerEffect' values — a pure data type — which are then
+-- executed by 'runProcessManagerEffects'.
+--
+-- This design cleanly separates the pure decision logic from effectful
+-- execution, making process managers easy to unit test.
 module Eventium.ProcessManager
   ( ProcessManager (..),
-    ProcessManagerCommand (..),
-    applyProcessManagerCommandsAndEvents,
+    ProcessManagerEffect (..),
+    runProcessManagerEffects,
   )
 where
 
-import Control.Monad (forM_, void)
-import Eventium.CommandHandler
 import Eventium.Projection
-import Eventium.Store.Class
+import Eventium.Store.Types
 import Eventium.UUID
 
--- | A 'ProcessManager' manages interaction between event streams. It works by
--- listening to events on an event bus and applying events to its internal
--- 'Projection' (see 'applyProcessManagerCommandsAndEvents'). Then, pending
--- commands and events are plucked off of that Projection and applied to the
--- appropriate 'CommandHandler' or Projections in other streams.
-data ProcessManager state event command
-  = ProcessManager
+-- | A 'ProcessManager' manages interaction between event streams. It
+-- listens to events and decides what commands to issue to other aggregates.
+--
+-- * 'processManagerProjection' — a pure fold over versioned stream events
+--   that tracks the process manager's state.
+-- * 'processManagerReact' — a pure function that, given the current state
+--   and a new event, returns a list of effects to execute.
+data ProcessManager state event command = ProcessManager
   { processManagerProjection :: Projection state (VersionedStreamEvent event),
-    processManagerPendingCommands :: state -> [ProcessManagerCommand event command],
-    processManagerPendingEvents :: state -> [StreamEvent UUID () event]
+    processManagerReact :: state -> VersionedStreamEvent event -> [ProcessManagerEffect command]
   }
 
--- | This is a @command@ along with the UUID of the target 'CommandHandler', as
--- well as the 'CommandHandler' type. Note that this uses an existential type
--- to hide the @state@ type parameter on the CommandHandler.
-data ProcessManagerCommand event command
-  = forall state. ProcessManagerCommand
-  { processManagerCommandTargetId :: UUID,
-    processManagerCommandCommandHandler :: CommandHandler state event command,
-    processManagerCommandCommand :: command
-  }
+-- | A side effect that a 'ProcessManager' wants to perform. This is a pure
+-- data type — it describes /what/ should happen, not /how/.
+data ProcessManagerEffect command
+  = -- | Issue a command to a specific aggregate (identified by 'UUID').
+    IssueCommand UUID command
+  deriving (Show, Eq)
 
-instance (Show command, Show event) => Show (ProcessManagerCommand event command) where
-  show (ProcessManagerCommand uuid _ command) =
-    "ProcessManagerCommand{processManagerCommandCommandHandlerId = "
-      ++ show uuid
-      ++ ", processManagerCommandCommand = "
-      ++ show command
-      ++ "}"
-
--- | Plucks the pending commands and events off of the process manager's state
--- and applies them to the appropriate locations in the event store.
-applyProcessManagerCommandsAndEvents ::
+-- | Execute a list of 'ProcessManagerEffect's using the provided command
+-- dispatcher.
+--
+-- The command dispatcher is a plain function @UUID -> command -> m ()@
+-- rather than a newtype, since commands are point-to-point (no fan-out)
+-- and only used here.
+runProcessManagerEffects ::
   (Monad m) =>
-  ProcessManager state event command ->
-  VersionedEventStoreWriter m event ->
-  VersionedEventStoreReader m event ->
-  state ->
+  (UUID -> command -> m ()) ->
+  [ProcessManagerEffect command] ->
   m ()
-applyProcessManagerCommandsAndEvents ProcessManager {..} writer reader state = do
-  forM_ (processManagerPendingCommands state) $ \(ProcessManagerCommand targetId commandHandler command) ->
-    void $ applyCommandHandler writer reader commandHandler targetId command
-  forM_ (processManagerPendingEvents state) $ \(StreamEvent projectionId () event) ->
-    storeEvents writer projectionId AnyPosition [event]
+runProcessManagerEffects dispatch = mapM_ go
+  where
+    go (IssueCommand uuid cmd) = dispatch uuid cmd

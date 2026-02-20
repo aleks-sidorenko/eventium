@@ -4,7 +4,7 @@ packages:
   eventium-postgresql
   eventium-sql-common
   eventium-sqlite
-  eventium-test-helpers  
+  eventium-testkit
   examples/cafe
   examples/bank
   examples/counter-cli

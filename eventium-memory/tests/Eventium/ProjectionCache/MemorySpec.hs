@@ -4,7 +4,7 @@ import Control.Concurrent.STM
 import Control.Monad.State.Strict
 import Eventium.ProjectionCache.Memory
 import Eventium.Store.Memory
-import Eventium.TestHelpers
+import Eventium.Testkit
 import MemoryTestImport
 import Test.Hspec
 

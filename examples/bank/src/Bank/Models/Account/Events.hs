@@ -3,13 +3,11 @@
 module Bank.Models.Account.Events
   ( accountEvents,
     AccountOpened (..),
-    AccountOpenRejected (..),
     AccountCredited (..),
     AccountDebited (..),
-    AccountDebitRejected (..),
     AccountTransferStarted (..),
     AccountTransferCompleted (..),
-    AccountTransferRejected (..),
+    AccountTransferFailed (..),
     AccountCreditedFromTransfer (..),
   )
 where
@@ -21,13 +19,11 @@ import Language.Haskell.TH (Name)
 accountEvents :: [Name]
 accountEvents =
   [ ''AccountOpened,
-    ''AccountOpenRejected,
     ''AccountCredited,
     ''AccountDebited,
-    ''AccountDebitRejected,
     ''AccountTransferStarted,
     ''AccountTransferCompleted,
-    ''AccountTransferRejected,
+    ''AccountTransferFailed,
     ''AccountCreditedFromTransfer
   ]
 
@@ -35,12 +31,6 @@ data AccountOpened
   = AccountOpened
   { accountOpenedOwner :: UUID,
     accountOpenedInitialFunding :: Double
-  }
-  deriving (Show, Eq)
-
-newtype AccountOpenRejected
-  = AccountOpenRejected
-  { accountOpenRejectedReason :: String
   }
   deriving (Show, Eq)
 
@@ -58,12 +48,6 @@ data AccountDebited
   }
   deriving (Show, Eq)
 
-newtype AccountDebitRejected
-  = AccountDebitRejected
-  { accountDebitRejectedRemainingBalance :: Double
-  }
-  deriving (Show, Eq)
-
 data AccountTransferStarted
   = AccountTransferStarted
   { accountTransferStartedTransferId :: UUID,
@@ -78,10 +62,10 @@ newtype AccountTransferCompleted
   }
   deriving (Show, Eq)
 
-data AccountTransferRejected
-  = AccountTransferRejected
-  { accountTransferRejectedTransferId :: UUID,
-    accountTransferRejectedReason :: String
+data AccountTransferFailed
+  = AccountTransferFailed
+  { accountTransferFailedTransferId :: UUID,
+    accountTransferFailedReason :: String
   }
   deriving (Show, Eq)
 
@@ -94,11 +78,9 @@ data AccountCreditedFromTransfer
   deriving (Show, Eq)
 
 deriveJSONUnPrefixLower ''AccountOpened
-deriveJSONUnPrefixLower ''AccountOpenRejected
 deriveJSONUnPrefixLower ''AccountCredited
 deriveJSONUnPrefixLower ''AccountDebited
-deriveJSONUnPrefixLower ''AccountDebitRejected
 deriveJSONUnPrefixLower ''AccountTransferStarted
 deriveJSONUnPrefixLower ''AccountTransferCompleted
-deriveJSONUnPrefixLower ''AccountTransferRejected
+deriveJSONUnPrefixLower ''AccountTransferFailed
 deriveJSONUnPrefixLower ''AccountCreditedFromTransfer

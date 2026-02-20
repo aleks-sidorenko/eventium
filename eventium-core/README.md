@@ -1,90 +1,137 @@
 # Eventium Core
 
-Core abstractions and utilities for building event sourcing systems in Haskell.
+Core abstractions for building event-sourced applications in Haskell.
 
 ## Overview
 
-`eventium-core` is the foundational package of the Eventium event sourcing framework. It provides all the essential abstractions, interfaces, and utilities needed to build event-sourced applications with CQRS patterns.
+`eventium-core` is the foundational package of the Eventium framework. It defines storage-agnostic interfaces and pure types -- no database drivers, no I/O beyond what the caller provides via monad parameters.
 
-## Key Components
+## Key Types
 
-### Event Store (`Eventium.Store.Class`)
-- **`EventStoreReader`** - Read events from streams (versioned and global)
-- **`EventStoreWriter`** - Append events with optimistic concurrency control
-- **`StreamEvent`** - Event metadata wrapper with stream keys and positions
+### StreamEvent
 
-### Projection (`Eventium.Projection`)
-Pure event fold for rebuilding state from events. Used for both domain aggregates (write model) and read models (query side).
+```haskell
+data StreamEvent key position event = StreamEvent
+  { streamEventKey      :: key
+  , streamEventPosition :: position
+  , streamEventMetadata :: EventMetadata
+  , streamEventEvent    :: event
+  }
+```
+
+Every stored event carries a stream key, a position, metadata (event type, correlation/causation IDs, timestamp), and the domain payload.
+
+### EventStoreReader / EventStoreWriter
+
+```haskell
+newtype EventStoreReader key position m event = EventStoreReader
+  { getEvents :: QueryRange key position -> m [event] }
+
+newtype EventStoreWriter key position m event = EventStoreWriter
+  { storeEvents :: key -> ExpectedPosition position -> [event]
+                -> m (Either (EventWriteError position) EventVersion) }
+```
+
+Polymorphic over key, position, monad, and event types. `runEventStoreReaderUsing` / `runEventStoreWriterUsing` lift between monads. `codecEventStoreReader` / `codecEventStoreWriter` wrap with a `Codec`.
+
+### Projection
 
 ```haskell
 data Projection state event = Projection
-  { projectionSeed :: state
+  { projectionSeed         :: state
   , projectionEventHandler :: state -> event -> state
   }
 ```
 
-### Command Handler (`Eventium.CommandHandler`)
-Implements the aggregate pattern from DDD/Event Sourcing. Processes commands, validates against current state, and emits events.
+Pure fold for rebuilding state from events. Used for both aggregates (write side) and read models (query side). `getLatestStreamProjection` loads events from a reader and applies them.
+
+### CommandHandler
 
 ```haskell
-data CommandHandler state event command = CommandHandler
-  { commandHandlerHandler :: state -> command -> [event]
+data CommandHandler state event command err = CommandHandler
+  { commandHandlerDecide     :: state -> command -> Either err [event]
   , commandHandlerProjection :: Projection state event
   }
 ```
 
-### Process Manager (`Eventium.ProcessManager`)
-Coordinates long-running business processes across multiple aggregates. Implements the Saga pattern for complex workflows.
+Validates a command against current state, returning either a domain error or new events. `applyCommandHandler` orchestrates the full load-decide-write cycle.
 
-### Read Model (`Eventium.ReadModel.Class`)
-Builds denormalized views optimized for queries. Tracks processed events for eventual consistency with the write side.
+### ProcessManager
 
-### Serializer (`Eventium.Serializer`)
-Type-safe event serialization/deserialization with JSON support and Template Haskell utilities for automatic boilerplate generation.
+```haskell
+data ProcessManager state event command = ProcessManager
+  { processManagerProjection :: Projection state (VersionedStreamEvent event)
+  , processManagerReact      :: state -> VersionedStreamEvent event
+                             -> [ProcessManagerEffect command]
+  }
 
-### Template Haskell Utilities (`Eventium.TH`)
-- **`deriveJSON`** - Generate JSON instances
-- **`deriveSumTypeSerializer`** - Generate serializers for sum types (event polymorphism)
-- **`makeProjection`** - Generate projection boilerplate
+newtype ProcessManagerEffect command
+  = IssueCommand UUID command
+```
 
-## Features
+Coordinates cross-aggregate workflows. `react` is pure; `runProcessManagerEffects` dispatches the resulting commands.
 
-- ✅ Type-safe event sourcing abstractions
-- ✅ Optimistic concurrency control with `ExpectedPosition`
-- ✅ CQRS pattern support (command/query separation)
-- ✅ Process Manager (Saga) pattern
-- ✅ Projection caching for performance
-- ✅ Template Haskell for reducing boilerplate
-- ✅ Storage backend agnostic (memory, SQL, NoSQL)
+### EventHandler / EventPublisher / EventSubscription
+
+- **EventHandler** -- composable event consumer (`Contravariant`, `Semigroup`, `Monoid`).
+- **EventPublisher** -- decouples post-write dispatch. `publishingEventStoreWriter` wraps a writer for auto-publish.
+- **EventSubscription** -- push-based delivery. `pollingSubscription` polls the global stream with a `CheckpointStore`.
+
+### Codec
+
+```haskell
+data Codec a b = Codec
+  { encode :: a -> b
+  , decode :: b -> Maybe a
+  }
+```
+
+Value-level bidirectional conversion. Composable via `composeCodecs`. `Eventium.TH` generates sum-type codecs and JSON instances.
+
+### TypeEmbedding
+
+```haskell
+data TypeEmbedding a b = TypeEmbedding
+  { embed   :: a -> b
+  , extract :: b -> Maybe a
+  }
+```
+
+Embeds one sum type into another (e.g. aggregate events into an application-wide event type). Separate from `Codec` to distinguish type-level subset relationships from wire-format encoding.
+
+## Modules
+
+| Module | Purpose |
+|--------|---------|
+| `Eventium.Store.Class` | Reader/Writer interfaces, monad lifting, codec wrappers |
+| `Eventium.Store.Types` | `StreamEvent`, `EventMetadata`, `EventVersion`, `SequenceNumber`, `ExpectedPosition` |
+| `Eventium.Store.Queries` | `QueryRange` builders (`allEvents`, `eventsStartingAt`, etc.) |
+| `Eventium.Projection` | `Projection`, `StreamProjection`, `getLatestStreamProjection` |
+| `Eventium.CommandHandler` | `CommandHandler`, `applyCommandHandler` |
+| `Eventium.ProcessManager` | `ProcessManager`, `ProcessManagerEffect`, `runProcessManagerEffects` |
+| `Eventium.EventHandler` | `EventHandler`, `handleEvents` |
+| `Eventium.EventPublisher` | `EventPublisher`, `publishingEventStoreWriter`, `synchronousPublisher` |
+| `Eventium.EventSubscription` | `EventSubscription`, `pollingSubscription`, `CheckpointStore` |
+| `Eventium.Codec` | `Codec`, `jsonCodec`, `jsonTextCodec`, `composeCodecs` |
+| `Eventium.UUID` | UUID utilities (`uuidNextRandom`, `uuidFromText`, `uuidFromInteger`) |
+| `Eventium.TH` | Template Haskell: `deriveJSON`, `mkSumTypeCodec`, `mkSumTypeEmbedding`, `makeProjection` |
+| `Eventium.ProjectionCache.Types` | Projection cache interface |
 
 ## Usage
 
-Add `eventium-core` to your package dependencies:
-
 ```yaml
 dependencies:
-  - eventium-core
+  - eventium-core >= 0.1.0
 ```
 
-Then choose a storage backend:
-- `eventium-memory` - In-memory (development/testing)
-- `eventium-sqlite` - SQLite (single-process apps)
-- `eventium-postgresql` - PostgreSQL (production systems)
-
-## Design Principles
-
-1. **Type Safety** - Phantom types prevent mixing concerns
-2. **Functional Purity** - Projections are pure folds
-3. **Abstraction** - Backend-agnostic core types
-4. **CQRS** - Clear command/query separation
-5. **Standard Patterns** - Aggregates, Sagas, Read Models
+Then pick a storage backend: `eventium-memory`, `eventium-sqlite`, or `eventium-postgresql`.
 
 ## Documentation
 
-- [Main README](../README.md) - Project overview
-- [Design Documentation](../DESIGN.md) - Detailed architecture
-- [Examples](../examples/) - Working applications
+- [Main README](../README.md)
+- [Design](../DESIGN.md)
+- [Examples](../examples/)
 
 ## License
 
-MIT - see [LICENSE.md](LICENSE.md)
+MIT -- see [LICENSE.md](LICENSE.md)

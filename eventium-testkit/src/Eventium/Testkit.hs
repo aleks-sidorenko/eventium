@@ -4,14 +4,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | Common test functionality
-module Eventium.TestHelpers
+module Eventium.Testkit
   ( Counter (..),
     CounterProjection,
     counterProjection,
     CounterCommandHandler,
+    CounterCommandError (..),
     counterCommandHandler,
     CounterEvent (..),
     CounterCommand (..),
+    allCommandHandlerStates,
     EventStoreRunner (..),
     GlobalStreamEventStoreRunner (..),
     eventStoreSpec,
@@ -31,6 +33,8 @@ import Control.Monad.Logger as X
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
+import Data.Foldable (foldl')
+import Data.List (scanl')
 import Data.Text (Text)
 import Eventium
 import Test.Hspec
@@ -58,7 +62,7 @@ counterGlobalProjection :: Projection Counter (VersionedStreamEvent CounterEvent
 counterGlobalProjection =
   Projection
     (Counter 0)
-    (\(Counter k) (StreamEvent _ _ (Added x)) -> Counter (k + x))
+    (\(Counter k) (StreamEvent _ _ _ (Added x)) -> Counter (k + x))
 
 data CounterCommand
   = Increment
@@ -69,23 +73,52 @@ data CounterCommand
       }
   deriving (Eq, Show)
 
-type CounterCommandHandler = CommandHandler Counter CounterEvent CounterCommand
+-- | Error type for counter command rejections.
+data CounterCommandError = CounterOutOfBounds
+  deriving (Eq, Show)
+
+type CounterCommandHandler = CommandHandler Counter CounterEvent CounterCommand CounterCommandError
 
 counterCommandHandler :: CounterCommandHandler
 counterCommandHandler = CommandHandler counterCommand counterProjection
 
-counterCommand :: Counter -> CounterCommand -> [CounterEvent]
+counterCommand :: Counter -> CounterCommand -> Either CounterCommandError [CounterEvent]
 counterCommand (Counter k) (Increment n) =
   if k + n <= 100
-    then [Added n]
-    else [CounterFailedOutOfBounds]
+    then Right [Added n]
+    else Left CounterOutOfBounds
 counterCommand (Counter k) (Decrement n) =
   if k - n >= 0
-    then [Added (-n)]
-    else [CounterFailedOutOfBounds]
+    then Right [Added (-n)]
+    else Left CounterOutOfBounds
 
 deriveJSON (aesonPrefix camelCase) ''CounterEvent
 deriveJSON (aesonPrefix camelCase) ''CounterCommand
+
+-- | Given a list of commands, produce all of the states the command handler's
+-- projection sees. This is useful for unit testing a 'CommandHandler' by
+-- verifying the intermediate states produced by a sequence of commands.
+--
+-- Commands that are rejected ('Left') leave the state unchanged.
+-- The first element of the returned list is the projection's seed state.
+--
+-- This is the canonical location for this utility. It was moved here from
+-- @eventium-core@ so that production code does not depend on test helpers.
+--
+-- @
+-- allCommandHandlerStates handler [cmd1, cmd2, cmd3]
+--   == [seed, stateAfterCmd1, stateAfterCmd2, stateAfterCmd3]
+-- @
+allCommandHandlerStates ::
+  CommandHandler state event command err ->
+  [command] ->
+  [state]
+allCommandHandlerStates (CommandHandler commandHandler (Projection seed eventHandler)) =
+  scanl' go seed
+  where
+    go state command = case commandHandler state command of
+      Left _ -> state
+      Right events -> foldl' eventHandler state events
 
 -- Test harness for stores
 

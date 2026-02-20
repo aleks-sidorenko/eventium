@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module Cafe.ChefTodoList
   ( chefTodoListMain,
   )
@@ -10,16 +8,15 @@ import Cafe.CLI.Transformer
 import Cafe.Models.Tab
 import Control.Monad (forM_, unless)
 import Control.Monad.Logger (runNoLoggingT)
+import Data.IORef
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes, mapMaybe)
-import Data.Monoid ((<>))
+import Data.Maybe (catMaybes)
 import Data.Text (pack)
 import Database.Persist.Sql
 import Database.Persist.Sqlite
 import Eventium
-import Eventium.ReadModel.Memory
 import Eventium.Store.Sqlite
 import Options.Applicative
 import System.Console.ANSI (clearScreen, setCursorPosition)
@@ -30,21 +27,30 @@ chefTodoListMain :: IO ()
 chefTodoListMain = do
   dbFilePath <- execParser $ info (helper <*> parseDatabaseFileOption) (fullDesc <> progDesc "Chef Todo List Terminal")
   pool <- runNoLoggingT $ createSqlitePool (pack dbFilePath) 1
-  readModel <- memoryReadModel Map.empty handleChefReadModelEvents
-  runPollingReadModel readModel cliGloballyOrderedEventStore (`runSqlPool` pool) 1
 
-handleChefReadModelEvents ::
-  Map UUID [Maybe Food] ->
-  [GlobalStreamEvent JSONString] ->
-  IO (Map UUID [Maybe Food])
-handleChefReadModelEvents foodMap (map streamEventEvent -> events) = do
-  let tabEvents = mapMaybe (traverse $ deserialize jsonStringSerializer) events :: [VersionedStreamEvent TabEvent]
-      foodMap' = foldl' handleEventToMap foodMap tabEvents
-  unless (null events) $ printFood foodMap'
-  return foodMap'
+  seqRef <- newIORef (0 :: SequenceNumber)
+  foodMapRef <- newIORef (Map.empty :: Map UUID [Maybe Food])
+
+  let checkpoint =
+        CheckpointStore
+          (readIORef seqRef)
+          (writeIORef seqRef)
+      globalReader = runEventStoreReaderUsing (`runSqlPool` pool) cliGloballyOrderedEventStore
+      sub = pollingSubscription globalReader checkpoint 1000
+      handler = EventHandler $ \globalEvent -> do
+        let inner = streamEventEvent globalEvent
+        case traverse (decode jsonStringCodec) inner of
+          Nothing -> return ()
+          Just tabEvent -> do
+            foodMap <- readIORef foodMapRef
+            let foodMap' = handleEventToMap foodMap tabEvent
+            writeIORef foodMapRef foodMap'
+            printFood foodMap'
+
+  runSubscription sub handler
 
 handleEventToMap :: Map UUID [Maybe Food] -> VersionedStreamEvent TabEvent -> Map UUID [Maybe Food]
-handleEventToMap foodMap (StreamEvent uuid _ (TabClosed _)) = Map.delete uuid foodMap
+handleEventToMap foodMap (StreamEvent uuid _ _ (TabClosed _)) = Map.delete uuid foodMap
 handleEventToMap foodMap streamEvent =
   let uuid = streamEventKey streamEvent
       oldList = Map.findWithDefault [] uuid foodMap

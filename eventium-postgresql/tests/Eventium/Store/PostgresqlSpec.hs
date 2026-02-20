@@ -9,7 +9,7 @@ import Data.Maybe (maybe)
 import Data.Text (Text)
 import Database.Persist.Postgresql
 import Eventium.Store.Postgresql
-import Eventium.TestHelpers
+import Eventium.Testkit
 import System.Environment (lookupEnv)
 import Test.Hspec
 
@@ -39,10 +39,10 @@ makeStore = do
           <> " password="
           <> pass
       writer =
-        serializedEventStoreWriter jsonStringSerializer $
+        codecEventStoreWriter jsonStringCodec $
           postgresqlEventStoreWriter defaultSqlEventStoreConfig
       reader =
-        serializedVersionedEventStoreReader jsonStringSerializer $
+        codecVersionedEventStoreReader jsonStringCodec $
           sqlEventStoreReader defaultSqlEventStoreConfig
   connString <-
     makeConnString
@@ -73,5 +73,5 @@ postgresStoreRunner = EventStoreRunner $ \action -> do
 postgresStoreGlobalRunner :: GlobalStreamEventStoreRunner (SqlPersistT IO)
 postgresStoreGlobalRunner = GlobalStreamEventStoreRunner $ \action -> do
   (writer, _, pool) <- makeStore
-  let globalReader = serializedGlobalEventStoreReader jsonStringSerializer (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
+  let globalReader = codecGlobalEventStoreReader jsonStringCodec (sqlGlobalEventStoreReader defaultSqlEventStoreConfig)
   runSqlPool (action writer globalReader) pool

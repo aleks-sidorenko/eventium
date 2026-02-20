@@ -44,7 +44,7 @@ tests:
     dependencies:
       - hspec
       - HUnit
-      - eventium-test-helpers
+      - eventium-testkit
       - persistent-postgresql
       - utf8-string
     build-tools:

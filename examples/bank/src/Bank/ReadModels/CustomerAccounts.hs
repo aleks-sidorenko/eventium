@@ -41,22 +41,22 @@ getCustomerAccountsFromName CustomerAccounts {..} name = fromMaybe [] $ do
   return $ mapMaybe lookupAccount accountIds
 
 handleCustomerAccountsEvent :: CustomerAccounts -> VersionedStreamEvent BankEvent -> CustomerAccounts
-handleCustomerAccountsEvent accounts (StreamEvent uuid _ (CustomerCreatedEvent (CustomerCreated name))) =
+handleCustomerAccountsEvent accounts (StreamEvent uuid _ _ (CustomerCreatedEvent (CustomerCreated name))) =
   accounts
     & customerAccountsCustomerIdsByName %~ Map.insert name uuid
-handleCustomerAccountsEvent accounts (StreamEvent uuid _ (AccountOpenedEvent event@(AccountOpened customerId _))) =
+handleCustomerAccountsEvent accounts (StreamEvent uuid _ _ (AccountOpenedEvent event@(AccountOpened customerId _))) =
   accounts
     & customerAccountsAccountsById %~ Map.insert uuid account
     & customerAccountsCustomerAccounts %~ Map.insertWith (++) customerId [uuid]
   where
     account = projectionEventHandler accountProjection (projectionSeed accountProjection) (AccountOpenedAccountEvent event)
 -- Assume it's an account event. If it isn't it won't get handled, no biggy.
-handleCustomerAccountsEvent accounts (StreamEvent uuid _ event) =
+handleCustomerAccountsEvent accounts (StreamEvent uuid _ _ event) =
   accounts
     & customerAccountsAccountsById %~ Map.adjust modifyAccount uuid
   where
     modifyAccount account =
-      maybe account (projectionEventHandler accountProjection account) (deserialize accountEventSerializer event)
+      maybe account (projectionEventHandler accountProjection account) (extract accountEventEmbedding event)
 
 customerAccountsProjection :: Projection CustomerAccounts (VersionedStreamEvent BankEvent)
 customerAccountsProjection =

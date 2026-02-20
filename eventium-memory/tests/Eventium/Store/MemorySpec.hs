@@ -2,9 +2,9 @@ module Eventium.Store.MemorySpec (spec) where
 
 import Control.Concurrent.STM
 import Control.Monad.State.Strict
-import Eventium.Serializer
+import Eventium.Codec
 import Eventium.Store.Memory
-import Eventium.TestHelpers
+import Eventium.Testkit
 import MemoryTestImport
 import Test.Hspec
 
@@ -14,7 +14,7 @@ spec = do
     eventStoreSpec tvarRunner
     globalStreamEventStoreSpec tvarGlobalRunner
 
-  describe "TVar memory event store with Dynamic serialized type" $ do
+  describe "TVar memory event store with Dynamic encoded type" $ do
     eventStoreSpec tvarDynamicRunner
     globalStreamEventStoreSpec tvarDynamicGlobalRunner
 
@@ -43,15 +43,15 @@ tvarGlobalRunner = GlobalStreamEventStoreRunner $ \action -> do
 tvarDynamicRunner :: EventStoreRunner STM
 tvarDynamicRunner = EventStoreRunner $ \action -> do
   eventTVar <- eventMapTVar
-  let writer = serializedEventStoreWriter dynamicSerializer $ tvarEventStoreWriter eventTVar
-      reader = serializedVersionedEventStoreReader dynamicSerializer $ tvarEventStoreReader eventTVar
+  let writer = codecEventStoreWriter dynamicCodec $ tvarEventStoreWriter eventTVar
+      reader = codecVersionedEventStoreReader dynamicCodec $ tvarEventStoreReader eventTVar
   atomically $ action writer reader
 
 tvarDynamicGlobalRunner :: GlobalStreamEventStoreRunner STM
 tvarDynamicGlobalRunner = GlobalStreamEventStoreRunner $ \action -> do
   eventTVar <- eventMapTVar
-  let writer = serializedEventStoreWriter dynamicSerializer $ tvarEventStoreWriter eventTVar
-      globalReader = serializedGlobalEventStoreReader dynamicSerializer $ tvarGlobalEventStoreReader eventTVar
+  let writer = codecEventStoreWriter dynamicCodec $ tvarEventStoreWriter eventTVar
+      globalReader = codecGlobalEventStoreReader dynamicCodec $ tvarGlobalEventStoreReader eventTVar
   atomically $ action writer globalReader
 
 stateStoreRunner :: EventStoreRunner (StateT (EventMap CounterEvent) IO)

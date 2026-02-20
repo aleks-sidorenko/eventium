@@ -16,12 +16,9 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
 import Eventium
 
-data TransferManager
+newtype TransferManager
   = TransferManager
-  { _transferManagerData :: Map UUID TransferManagerTransferData,
-    _transferManagerCanceled :: Bool,
-    _transferManagerPendingCommands :: [ProcessManagerCommand BankEvent BankCommand],
-    _transferManagerPendingEvents :: [StreamEvent UUID () BankEvent]
+  { _transferManagerData :: Map UUID TransferManagerTransferData
   }
   deriving (Show)
 
@@ -35,61 +32,49 @@ data TransferManagerTransferData
 makeLenses ''TransferManager
 
 transferManagerDefault :: TransferManager
-transferManagerDefault = TransferManager Map.empty False [] []
+transferManagerDefault = TransferManager Map.empty
 
 transferManagerProjection :: Projection TransferManager (VersionedStreamEvent BankEvent)
 transferManagerProjection =
   Projection
     transferManagerDefault
-    handleAccountEvent
+    handleTransferEvent
 
-handleAccountEvent :: TransferManager -> VersionedStreamEvent BankEvent -> TransferManager
-handleAccountEvent manager (StreamEvent sourceAccount _ (AccountTransferStartedEvent AccountTransferStarted {..})) =
+handleTransferEvent :: TransferManager -> VersionedStreamEvent BankEvent -> TransferManager
+handleTransferEvent manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEvent AccountTransferStarted {..})) =
   manager
     & transferManagerData . at accountTransferStartedTransferId
       ?~ TransferManagerTransferData
         { transferSourceAccount = sourceAccount,
           transferTargetAccount = accountTransferStartedTargetAccount
         }
-    & transferManagerPendingCommands
-      .~ [ ProcessManagerCommand accountTransferStartedTargetAccount accountBankCommandHandler command
-           | isNothing (manager ^. transferManagerData . at accountTransferStartedTransferId)
-         ]
-    & transferManagerPendingEvents .~ []
-  where
-    command =
-      AcceptTransferCommand
-        AcceptTransfer
-          { acceptTransferTransferId = accountTransferStartedTransferId,
-            acceptTransferSourceAccount = sourceAccount,
-            acceptTransferAmount = accountTransferStartedAmount
-          }
-handleAccountEvent manager (StreamEvent _ _ (AccountTransferRejectedEvent AccountTransferRejected {..})) =
-  manager
-    & transferManagerCanceled .~ True
-    & transferManagerPendingCommands .~ []
-    & transferManagerPendingEvents .~ if manager ^. transferManagerCanceled then [] else events
-  where
-    events = maybe [] mkEvent (manager ^. transferManagerData . at accountTransferRejectedTransferId)
-    mkEvent (TransferManagerTransferData sourceId _) =
-      -- TODO: Find a way to get the actual error so we can put it in this
-      -- event.
-      [ StreamEvent sourceId () $
-          AccountTransferRejectedEvent $
-            AccountTransferRejected accountTransferRejectedTransferId "Rejected in transfer saga"
+handleTransferEvent manager _ = manager
+
+reactTransfer :: TransferManager -> VersionedStreamEvent BankEvent -> [ProcessManagerEffect BankCommand]
+reactTransfer manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEvent AccountTransferStarted {..}))
+  | isNothing (manager ^. transferManagerData . at accountTransferStartedTransferId) =
+      [ IssueCommand
+          accountTransferStartedTargetAccount
+          ( AcceptTransferCommand
+              AcceptTransfer
+                { acceptTransferTransferId = accountTransferStartedTransferId,
+                  acceptTransferSourceAccount = sourceAccount,
+                  acceptTransferAmount = accountTransferStartedAmount
+                }
+          )
       ]
-handleAccountEvent manager (StreamEvent _ _ (AccountCreditedFromTransferEvent AccountCreditedFromTransfer {..})) =
-  manager
-    & transferManagerPendingCommands .~ []
-    & transferManagerPendingEvents .~ events
+  | otherwise = []
+reactTransfer manager (StreamEvent _ _ _ (AccountCreditedFromTransferEvent AccountCreditedFromTransfer {..})) =
+  maybe [] mkEffect (manager ^. transferManagerData . at accountCreditedFromTransferTransferId)
   where
-    events = maybe [] mkEvent (manager ^. transferManagerData . at accountCreditedFromTransferTransferId)
-    mkEvent (TransferManagerTransferData sourceId _) =
-      [StreamEvent sourceId () $ AccountTransferCompletedEvent $ AccountTransferCompleted accountCreditedFromTransferTransferId]
-handleAccountEvent manager _ =
-  manager
-    & transferManagerPendingCommands .~ []
-    & transferManagerPendingEvents .~ []
+    mkEffect (TransferManagerTransferData sourceId _) =
+      [ IssueCommand
+          sourceId
+          ( CompleteTransferCommand $
+              CompleteTransfer accountCreditedFromTransferTransferId
+          )
+      ]
+reactTransfer _ _ = []
 
 type TransferProcessManager = ProcessManager TransferManager BankEvent BankCommand
 
@@ -97,5 +82,4 @@ transferProcessManager :: TransferProcessManager
 transferProcessManager =
   ProcessManager
     transferManagerProjection
-    (view transferManagerPendingCommands)
-    (view transferManagerPendingEvents)
+    reactTransfer

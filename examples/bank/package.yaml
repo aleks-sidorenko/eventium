@@ -58,5 +58,6 @@ tests:
     dependencies:
       - hspec
       - HUnit
+      - eventium-testkit
     build-tools:
       - hspec-discover

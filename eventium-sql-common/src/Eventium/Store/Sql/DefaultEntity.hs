@@ -21,6 +21,8 @@ module Eventium.Store.Sql.DefaultEntity
   )
 where
 
+import Data.Text (Text)
+import Data.Time (UTCTime)
 import Database.Persist (Key)
 import Database.Persist.Sql (fromSqlKey, toSqlKey)
 import Database.Persist.TH
@@ -36,7 +38,11 @@ share
 SqlEvent sql=events
     uuid UUID
     version EventVersion
+    eventType Text
     event JSONString
+    correlationId UUID Maybe
+    causationId UUID Maybe
+    createdAt UTCTime Maybe
     UniqueUuidVersion uuid version
     deriving Show
 |]
@@ -52,13 +58,18 @@ sqlEventUnKey key =
 defaultSqlEventStoreConfig :: SqlEventStoreConfig SqlEvent JSONString
 defaultSqlEventStoreConfig =
   SqlEventStoreConfig
-    SqlEvent
-    sqlEventMakeKey
-    sqlEventUnKey
-    sqlEventUuid
-    sqlEventVersion
-    sqlEventEvent
-    SqlEventId
-    SqlEventUuid
-    SqlEventVersion
-    SqlEventEvent
+    { sqlEventStoreConfigSequenceMakeEntity = SqlEvent,
+      sqlEventStoreConfigMakeKey = sqlEventMakeKey,
+      sqlEventStoreConfigUnKey = sqlEventUnKey,
+      sqlEventStoreConfigUUID = sqlEventUuid,
+      sqlEventStoreConfigVersion = sqlEventVersion,
+      sqlEventStoreConfigEventType = sqlEventEventType,
+      sqlEventStoreConfigData = sqlEventEvent,
+      sqlEventStoreConfigCorrelationId = sqlEventCorrelationId,
+      sqlEventStoreConfigCausationId = sqlEventCausationId,
+      sqlEventStoreConfigCreatedAt = sqlEventCreatedAt,
+      sqlEventStoreConfigSequenceNumberField = SqlEventId,
+      sqlEventStoreConfigUUIDField = SqlEventUuid,
+      sqlEventStoreConfigVersionField = SqlEventVersion,
+      sqlEventStoreConfigDataField = SqlEventEvent
+    }

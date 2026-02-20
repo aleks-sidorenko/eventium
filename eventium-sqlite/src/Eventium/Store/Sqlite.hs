@@ -6,6 +6,7 @@
 -- | Defines an Sqlite event store.
 module Eventium.Store.Sqlite
   ( sqliteEventStoreWriter,
+    sqliteEventStoreWriterTagged,
     initializeSqliteEventStore,
     module Eventium.Store.Class,
     module Eventium.Store.Sql,
@@ -32,6 +33,17 @@ sqliteEventStoreWriter config = EventStoreWriter $ transactionalExpectedWriteHel
     getLatestVersion = sqlMaxEventVersion config maxSqliteVersionSql
     storeEvents' = sqlStoreEvents config Nothing maxSqliteVersionSql
 
+-- | Like 'sqliteEventStoreWriter' but accepts 'TaggedEvent's,
+-- preserving the metadata attached to each event.
+sqliteEventStoreWriterTagged ::
+  (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend, SafeToInsert entity) =>
+  SqlEventStoreConfig entity serialized ->
+  VersionedEventStoreWriter (SqlPersistT m) (TaggedEvent serialized)
+sqliteEventStoreWriterTagged config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+  where
+    getLatestVersion = sqlMaxEventVersion config maxSqliteVersionSql
+    storeEvents' = sqlStoreEventsTagged config Nothing maxSqliteVersionSql
+
 maxSqliteVersionSql :: FieldNameDB -> FieldNameDB -> FieldNameDB -> Text
 maxSqliteVersionSql (FieldNameDB tableName) (FieldNameDB uuidFieldName) (FieldNameDB versionFieldName) =
   "SELECT IFNULL(MAX(" <> versionFieldName <> "), -1) FROM " <> tableName <> " WHERE " <> uuidFieldName <> " = ?"
@@ -48,7 +60,7 @@ initializeSqliteEventStore SqlEventStoreConfig {..} pool = do
   _ <- liftIO $ runSqlPool (runMigrationSilent migrateSqlEvent) pool
 
   -- Create index on uuid field so retrieval is very fast
-  let tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity undefined undefined undefined)
+  let tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity undefined undefined undefined undefined undefined undefined undefined)
       uuidFieldName = unFieldNameDB $ fieldDBName sqlEventStoreConfigSequenceNumberField
       indexSql =
         "CREATE INDEX IF NOT EXISTS "

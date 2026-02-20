@@ -11,6 +11,7 @@ module Bank.Models.Account.Projection
     PendingAccountTransfer (..),
     AccountEvent (..),
     accountProjection,
+    findAccountTransferById,
   )
 where
 
@@ -67,14 +68,12 @@ handleAccountEvent account (AccountOpenedAccountEvent AccountOpened {..}) =
   account
     & accountOwner ?~ accountOpenedOwner
     & accountBalance .~ accountOpenedInitialFunding
-handleAccountEvent account (AccountOpenRejectedAccountEvent _) = account
 handleAccountEvent account (AccountCreditedAccountEvent AccountCredited {..}) =
   account
     & accountBalance +~ accountCreditedAmount
 handleAccountEvent account (AccountDebitedAccountEvent AccountDebited {..}) =
   account
     & accountBalance -~ accountDebitedAmount
-handleAccountEvent account (AccountDebitRejectedAccountEvent _) = account
 handleAccountEvent account (AccountTransferStartedAccountEvent AccountTransferStarted {..}) =
   account
     & accountPendingTransfers
@@ -94,12 +93,12 @@ handleAccountEvent account (AccountTransferCompletedAccountEvent AccountTransfer
       account
         & accountBalance -~ pendingAccountTransferAmount trans
         & accountPendingTransfers %~ delete trans
-handleAccountEvent account (AccountTransferRejectedAccountEvent AccountTransferRejected {..}) =
+handleAccountEvent account (AccountTransferFailedAccountEvent AccountTransferFailed {..}) =
   account
     & accountPendingTransfers .~ transfers'
   where
     transfers = account ^. accountPendingTransfers
-    mTransfer = findAccountTransferById transfers accountTransferRejectedTransferId
+    mTransfer = findAccountTransferById transfers accountTransferFailedTransferId
     transfers' = maybe transfers (`delete` transfers) mTransfer
 handleAccountEvent account (AccountCreditedFromTransferAccountEvent AccountCreditedFromTransfer {..}) =
   account

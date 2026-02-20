@@ -1,14 +1,18 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Eventium.Store.Memory
   ( tvarEventStoreReader,
     tvarEventStoreWriter,
+    tvarEventStoreWriterTagged,
     tvarGlobalEventStoreReader,
     stateEventStoreReader,
     stateEventStoreWriter,
+    stateEventStoreWriterTagged,
     stateGlobalEventStoreReader,
     embeddedStateEventStoreReader,
     embeddedStateEventStoreWriter,
+    embeddedStateEventStoreWriterTagged,
     embeddedStateGlobalEventStoreReader,
     EventMap,
     emptyEventMap,
@@ -60,6 +64,18 @@ tvarEventStoreWriter tvar = EventStoreWriter $ transactionalExpectedWriteHelper 
       writeTVar tvar store'
       return vers
 
+-- | Like 'tvarEventStoreWriter' but accepts 'TaggedEvent's,
+-- preserving the metadata attached to each event.
+tvarEventStoreWriterTagged :: TVar (EventMap event) -> VersionedEventStoreWriter STM (TaggedEvent event)
+tvarEventStoreWriterTagged tvar = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+  where
+    getLatestVersion uuid = flip latestEventVersion uuid <$> readTVar tvar
+    storeEvents' uuid events = do
+      store <- readTVar tvar
+      let (store', vers) = storeEventMapTagged store uuid events
+      writeTVar tvar store'
+      return vers
+
 -- | Analog of 'tvarEventStoreReader' for a 'GlobalEventStoreReader'
 tvarGlobalEventStoreReader :: TVar (EventMap event) -> GlobalEventStoreReader STM event
 tvarGlobalEventStoreReader tvar = EventStoreReader $ \range -> lookupGlobalEvents range <$> readTVar tvar
@@ -82,6 +98,12 @@ stateEventStoreWriter ::
   (MonadState (EventMap event) m) =>
   VersionedEventStoreWriter m event
 stateEventStoreWriter = embeddedStateEventStoreWriter id (const id)
+
+-- | Like 'stateEventStoreWriter' but accepts 'TaggedEvent's.
+stateEventStoreWriterTagged ::
+  (MonadState (EventMap event) m) =>
+  VersionedEventStoreWriter m (TaggedEvent event)
+stateEventStoreWriterTagged = embeddedStateEventStoreWriterTagged id (const id)
 
 -- | An 'EventStore' that runs on some 'MonadState' that contains an
 -- 'EventMap'. This is useful if you want to include other state in your
@@ -113,6 +135,22 @@ embeddedStateGlobalEventStoreReader ::
   (s -> EventMap event) ->
   GlobalEventStoreReader m event
 embeddedStateGlobalEventStoreReader getMap = EventStoreReader $ \range -> lookupGlobalEvents range <$> gets getMap
+
+-- | Like 'embeddedStateEventStoreWriter' but accepts 'TaggedEvent's.
+embeddedStateEventStoreWriterTagged ::
+  (MonadState s m) =>
+  (s -> EventMap event) ->
+  (s -> EventMap event -> s) ->
+  VersionedEventStoreWriter m (TaggedEvent event)
+embeddedStateEventStoreWriterTagged getMap setMap = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+  where
+    getLatestVersion uuid = flip latestEventVersion uuid <$> gets getMap
+    storeEvents' uuid events = do
+      state' <- get
+      let store = getMap state'
+      let (store', vers) = storeEventMapTagged store uuid events
+      put $ setMap state' store'
+      return vers
 
 lookupEventMapRaw :: EventMap event -> UUID -> Seq (VersionedStreamEvent event)
 lookupEventMapRaw (EventMap uuidMap _) uuid = fromMaybe Seq.empty $ Map.lookup uuid uuidMap
@@ -146,7 +184,7 @@ lookupGlobalEvents (QueryRange () start limit) (EventMap _ globalEvents) = event
     start' = unSequenceNumber <$> start
     limit' = unSequenceNumber <$> limit
     events = toList $ filterEventsByRange start' limit' 1 globalEvents
-    events' = zipWith (StreamEvent ()) [startingSeqNum ..] events
+    events' = zipWith (\s e -> StreamEvent () s (streamEventMetadata e) e) [startingSeqNum ..] events
     startingSeqNum =
       case start of
         StartFromBeginning -> 1
@@ -156,7 +194,20 @@ storeEventMap ::
   EventMap event -> UUID -> [event] -> (EventMap event, EventVersion)
 storeEventMap store@(EventMap uuidMap globalEvents) uuid events =
   let versStart = latestEventVersion store uuid
-      streamEvents = zipWith (StreamEvent uuid) [versStart + 1 ..] events
+      streamEvents = zipWith (\v e -> StreamEvent uuid v (emptyMetadata "") e) [versStart + 1 ..] events
       newMap = Map.insertWith (flip (><)) uuid (Seq.fromList streamEvents) uuidMap
       globalEvents' = globalEvents >< Seq.fromList streamEvents
    in (EventMap newMap globalEvents', versStart + EventVersion (length events))
+
+storeEventMapTagged ::
+  EventMap event -> UUID -> [TaggedEvent event] -> (EventMap event, EventVersion)
+storeEventMapTagged store@(EventMap uuidMap globalEvents) uuid taggedEvents =
+  let versStart = latestEventVersion store uuid
+      streamEvents =
+        zipWith
+          (\v (TaggedEvent meta e) -> StreamEvent uuid v meta e)
+          [versStart + 1 ..]
+          taggedEvents
+      newMap = Map.insertWith (flip (><)) uuid (Seq.fromList streamEvents) uuidMap
+      globalEvents' = globalEvents >< Seq.fromList streamEvents
+   in (EventMap newMap globalEvents', versStart + EventVersion (length taggedEvents))

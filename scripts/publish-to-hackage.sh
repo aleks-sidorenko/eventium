@@ -82,7 +82,7 @@ PROJECTS=(
   "eventium-postgresql"
   "eventium-sql-common"
   "eventium-sqlite"
-  "eventium-test-helpers"
+  "eventium-testkit"
 )
 
 echo "📝 Step 1: Running hpack on all package.yaml files..."

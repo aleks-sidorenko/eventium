@@ -12,16 +12,20 @@ module Eventium.Projection
     globalStreamProjection,
     streamProjectionEventHandler,
     getLatestStreamProjection,
-    serializedProjection,
+    codecProjection,
+    lenientCodecProjection,
+    embeddedProjection,
     projectionMapMaybe,
   )
 where
 
+import Control.Exception (throw)
 import Data.Foldable (foldl')
 import Data.Functor.Contravariant
 import Data.List (scanl')
-import Eventium.Serializer
+import Eventium.Codec
 import Eventium.Store.Class
+import Eventium.TypeEmbedding
 import Eventium.UUID
 
 -- | A 'Projection' is a piece of @state@ that is constructed only from
@@ -101,10 +105,10 @@ streamProjectionEventHandler ::
   StreamProjection key position state event ->
   StreamEvent eventKey position event ->
   StreamProjection key position state event
-streamProjectionEventHandler StreamProjection {..} event =
+streamProjectionEventHandler StreamProjection {..} streamEvent =
   let Projection {..} = streamProjectionProjection
-      position' = streamEventPosition event
-      state' = projectionEventHandler streamProjectionState (streamEventEvent event)
+      position' = streamEventPosition streamEvent
+      state' = projectionEventHandler streamProjectionState (streamEventEvent streamEvent)
    in StreamProjection streamProjectionKey position' streamProjectionProjection state'
 
 -- | Gets the latest projection from a store by querying events from the latest
@@ -118,13 +122,42 @@ getLatestStreamProjection (EventStoreReader getEvents') projection@StreamProject
   events <- getEvents' (eventsStartingAt streamProjectionKey $ streamProjectionPosition + 1)
   return $ foldl' streamProjectionEventHandler projection events
 
--- | Use a 'Serializer' to wrap a 'Projection' with event type @event@ so it
--- uses the @serialized@ type.
-serializedProjection ::
+-- | Use a 'Codec' to wrap a 'Projection' with event type @event@ so it
+-- uses the @encoded@ type. Throws 'DecodeError' if decoding
+-- fails. Use 'lenientCodecProjection' to silently skip unrecognized events.
+codecProjection ::
+  Codec event encoded ->
   Projection state event ->
-  Serializer event serialized ->
-  Projection state serialized
-serializedProjection proj Serializer {..} = projectionMapMaybe deserialize proj
+  Projection state encoded
+codecProjection codec (Projection seed handler) =
+  Projection seed handler'
+  where
+    handler' state encoded =
+      case decode codec encoded of
+        Just event -> handler state event
+        Nothing -> throw $ DecodeError "codecProjection" "Failed to decode event"
+
+-- | Like 'codecProjection' but silently drops events that fail to
+-- decode. Useful for projections that only care about a subset of event
+-- types (e.g. when using a sum-type codec).
+--
+-- Recommended for production use when using sum-type codecs, as it
+-- allows projections to gracefully handle events they don't recognize.
+lenientCodecProjection ::
+  Codec event encoded ->
+  Projection state event ->
+  Projection state encoded
+lenientCodecProjection codec = projectionMapMaybe (decode codec)
+
+-- | Adapt a 'Projection' using a 'TypeEmbedding'. Events that do not belong
+-- to the embedded subset are silently skipped. This is the correct semantics
+-- for type embeddings, where it is expected that many events in the superset
+-- will not match the subset.
+embeddedProjection ::
+  TypeEmbedding event adapted ->
+  Projection state event ->
+  Projection state adapted
+embeddedProjection emb = projectionMapMaybe (extract emb)
 
 -- | Transform a 'Projection' when you only have a partial relationship between
 -- the source event type and the target event type.

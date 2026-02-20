@@ -23,7 +23,6 @@ import Control.Lens
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.TH
-import Data.Either (fromRight)
 import Data.List (foldl')
 import Data.Maybe (catMaybes, isJust)
 import Eventium
@@ -161,12 +160,10 @@ applyTabCommand _ (MarkDrinksServed indexes) = Right [DrinksServed indexes]
 applyTabCommand _ (MarkFoodPrepared indexes) = Right [FoodPrepared indexes]
 applyTabCommand _ (MarkFoodServed indexes) = Right [FoodServed indexes]
 
-type TabCommandHandler = CommandHandler TabState TabEvent TabCommand
+type TabCommandHandler = CommandHandler TabState TabEvent TabCommand TabCommandError
 
 tabCommandHandler :: TabCommandHandler
-tabCommandHandler = CommandHandler (fromRight [] `compose` applyTabCommand) tabProjection
-  where
-    compose = (.) . (.)
+tabCommandHandler = CommandHandler applyTabCommand tabProjection
 
 -- | List of all drinks. The menu could be its own CommandHandler in the future.
 allDrinks :: [Drink]

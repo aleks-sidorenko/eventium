@@ -5,6 +5,7 @@
 -- | Defines an Postgresql event store.
 module Eventium.Store.Postgresql
   ( postgresqlEventStoreWriter,
+    postgresqlEventStoreWriterTagged,
     module Eventium.Store.Class,
     module Eventium.Store.Sql,
   )
@@ -33,6 +34,17 @@ postgresqlEventStoreWriter config = EventStoreWriter $ transactionalExpectedWrit
 maxPostgresVersionSql :: FieldNameDB -> FieldNameDB -> FieldNameDB -> Text
 maxPostgresVersionSql (FieldNameDB tableName) (FieldNameDB uuidFieldName) (FieldNameDB versionFieldName) =
   "SELECT COALESCE(MAX(" <> versionFieldName <> "), -1) FROM " <> tableName <> " WHERE " <> uuidFieldName <> " = ?"
+
+-- | Like 'postgresqlEventStoreWriter' but accepts 'TaggedEvent's,
+-- preserving the metadata attached to each event.
+postgresqlEventStoreWriterTagged ::
+  (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend, SafeToInsert entity) =>
+  SqlEventStoreConfig entity serialized ->
+  VersionedEventStoreWriter (SqlPersistT m) (TaggedEvent serialized)
+postgresqlEventStoreWriterTagged config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+  where
+    getLatestVersion = sqlMaxEventVersion config maxPostgresVersionSql
+    storeEvents' = sqlStoreEventsTagged config (Just tableLockFunc) maxPostgresVersionSql
 
 -- | We need to lock the events table or else our global sequence number might
 -- not be monotonically increasing over time from the point of view of a

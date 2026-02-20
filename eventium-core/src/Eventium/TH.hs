@@ -4,4 +4,4 @@ module Eventium.TH
 where
 
 import Eventium.TH.Projection as X
-import Eventium.TH.SumTypeSerializer as X
+import Eventium.TH.SumTypeCodec as X

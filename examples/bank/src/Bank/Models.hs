@@ -4,12 +4,12 @@
 module Bank.Models
   ( BankEvent (..),
     BankCommand (..),
-    accountEventSerializer,
-    accountCommandSerializer,
+    accountEventEmbedding,
+    accountCommandEmbedding,
     accountBankProjection,
     accountBankCommandHandler,
-    customerEventSerializer,
-    customerCommandSerializer,
+    customerEventEmbedding,
+    customerCommandEmbedding,
     customerBankProjection,
     customerBankCommandHandler,
     module X,
@@ -20,6 +20,7 @@ import Bank.Json
 import Bank.Models.Account as X
 import Bank.Models.Customer as X
 import Data.Aeson.TH
+import Data.Void (Void)
 import Eventium
 import Eventium.TH
 import SumTypesX.TH
@@ -40,20 +41,20 @@ deriving instance Show BankCommand
 
 deriving instance Eq BankCommand
 
-mkSumTypeSerializer "accountEventSerializer" ''AccountEvent ''BankEvent
-mkSumTypeSerializer "accountCommandSerializer" ''AccountCommand ''BankCommand
+mkSumTypeEmbedding "accountEventEmbedding" ''AccountEvent ''BankEvent
+mkSumTypeEmbedding "accountCommandEmbedding" ''AccountCommand ''BankCommand
 
 accountBankProjection :: Projection Account BankEvent
-accountBankProjection = serializedProjection accountProjection accountEventSerializer
+accountBankProjection = embeddedProjection accountEventEmbedding accountProjection
 
-accountBankCommandHandler :: CommandHandler Account BankEvent BankCommand
-accountBankCommandHandler = serializedCommandHandler accountCommandHandler accountEventSerializer accountCommandSerializer
+accountBankCommandHandler :: CommandHandler Account BankEvent BankCommand AccountCommandError
+accountBankCommandHandler = embeddedCommandHandler accountEventEmbedding accountCommandEmbedding accountCommandHandler
 
-mkSumTypeSerializer "customerEventSerializer" ''CustomerEvent ''BankEvent
-mkSumTypeSerializer "customerCommandSerializer" ''CustomerCommand ''BankCommand
+mkSumTypeEmbedding "customerEventEmbedding" ''CustomerEvent ''BankEvent
+mkSumTypeEmbedding "customerCommandEmbedding" ''CustomerCommand ''BankCommand
 
 customerBankProjection :: Projection Customer BankEvent
-customerBankProjection = serializedProjection customerProjection customerEventSerializer
+customerBankProjection = embeddedProjection customerEventEmbedding customerProjection
 
-customerBankCommandHandler :: CommandHandler Customer BankEvent BankCommand
-customerBankCommandHandler = serializedCommandHandler customerCommandHandler customerEventSerializer customerCommandSerializer
+customerBankCommandHandler :: CommandHandler Customer BankEvent BankCommand Void
+customerBankCommandHandler = embeddedCommandHandler customerEventEmbedding customerCommandEmbedding customerCommandHandler

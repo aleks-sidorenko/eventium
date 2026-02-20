@@ -1,58 +1,59 @@
 # Eventium Memory
 
-In-memory implementations of event stores, read models, and projection caches for Eventium.
+In-memory event store for Eventium, backed by STM.
 
 ## Overview
 
-`eventium-memory` provides thread-safe, in-memory storage implementations for the Eventium event sourcing framework. This package is ideal for development, testing, and prototyping event-sourced applications without requiring external dependencies like databases.
+`eventium-memory` provides thread-safe, in-memory implementations of
+`EventStoreReader` and `EventStoreWriter` for development, testing, and
+prototyping. No external database is required.
 
-## Features
+## API
 
-- ✅ **In-Memory Event Store** - Fast, STM-based event storage
-- ✅ **Thread-Safe** - Concurrent access via Software Transactional Memory
-- ✅ **No External Dependencies** - No database setup required
-- ✅ **Perfect for Testing** - Fast test execution with isolated state
-- ✅ **Projection Cache** - In-memory snapshot storage
-- ✅ **Read Model Support** - Memory-based read model implementation
+```haskell
+-- Create a TVar-backed store
+eventMapTVar :: IO (TVar (EventMap event))
 
-## Components
+-- TVar-based (for use inside STM or lifted to IO)
+tvarEventStoreReader       :: TVar (EventMap event) -> VersionedEventStoreReader STM event
+tvarEventStoreWriter       :: TVar (EventMap event) -> VersionedEventStoreWriter STM event
+tvarGlobalEventStoreReader :: TVar (EventMap event) -> GlobalEventStoreReader STM event
 
-### Event Store (`Eventium.Store.Memory`)
-Implements both `EventStoreReader` and `EventStoreWriter` with:
-- Per-stream versioning
-- Global event ordering
-- Optimistic concurrency control
-- STM transactions for atomicity
+-- MonadState-based (for pure state threading)
+stateEventStoreReader       :: (MonadState (EventMap event) m) => VersionedEventStoreReader m event
+stateEventStoreWriter       :: (MonadState (EventMap event) m) => VersionedEventStoreWriter m event
+stateGlobalEventStoreReader :: (MonadState (EventMap event) m) => GlobalEventStoreReader m event
+```
 
-### Read Model (`Eventium.ReadModel.Memory`)
-In-memory read model implementation for building query-optimized views.
-
-### Projection Cache (`Eventium.ProjectionCache.Memory`)
-Stores projection snapshots in memory to avoid replaying entire event histories.
+Use `runEventStoreReaderUsing atomically` / `runEventStoreWriterUsing atomically`
+to lift the STM stores into IO.
 
 ## Usage
 
 ```haskell
-import Eventium.Store.Memory (newEventStore)
 import Control.Concurrent.STM (atomically)
+import Eventium
+import Eventium.Store.Memory
 
 main :: IO ()
 main = do
-  -- Create a new in-memory event store
-  store <- atomically newEventStore
-  
-  -- Use it with your command handlers and projections
-  result <- applyCommandHandler 
-    (eventStoreWriter store)
-    (eventStoreReader store) 
-    myCommandHandler 
-    aggregateId 
-    command
+  tvar <- eventMapTVar
+  let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter tvar)
+      reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
+
+  result <- applyCommandHandler writer reader myHandler aggregateId cmd
+  print result
 ```
 
-## Installation
+## When to Use
 
-Add to your `package.yaml`:
+- **Testing** -- fast, isolated, no I/O overhead.
+- **Prototyping** -- iterate on domain logic without database setup.
+- **Examples** -- the counter-cli example uses this backend.
+
+For persistent storage, use `eventium-sqlite` or `eventium-postgresql`.
+
+## Installation
 
 ```yaml
 dependencies:
@@ -60,63 +61,12 @@ dependencies:
   - eventium-memory
 ```
 
-Or to your `.cabal` file:
-
-```cabal
-build-depends:
-    eventium-core
-  , eventium-memory
-```
-
-## Use Cases
-
-### Development
-Quickly prototype event-sourced applications without database setup.
-
-### Testing
-- Fast test execution (no I/O overhead)
-- Isolated test state (each test gets fresh store)
-- Easy verification of event sequences
-
-### Demonstration
-Perfect for demos, tutorials, and learning event sourcing concepts.
-
-## Example
-
-```haskell
--- Create store
-store <- atomically newEventStore
-
--- Write events
-writeResult <- atomically $ 
-  writeEvents (eventStoreWriter store) 
-    streamKey 
-    ExpectedPositionAny 
-    [event1, event2]
-
--- Read events back
-events <- atomically $ 
-  readEvents (eventStoreReader store) 
-    streamKey 
-    QueryRangeAll
-```
-
-## Limitations
-
-- **Not Persistent** - All data lost when process ends
-- **Memory Constraints** - Limited by available RAM
-- **Single Process** - No distributed access
-
-For production use, consider:
-- `eventium-sqlite` - Persistent, single-process storage
-- `eventium-postgresql` - Persistent, multi-process storage
-
 ## Documentation
 
-- [Main README](../README.md) - Project overview
-- [Design Documentation](../DESIGN.md) - Architecture details
-- [Examples](../examples/) - Working applications
+- [Main README](../README.md)
+- [Design](../DESIGN.md)
+- [Examples](../examples/)
 
 ## License
 
-MIT - see [LICENSE.md](LICENSE.md)
+MIT -- see [LICENSE.md](LICENSE.md)

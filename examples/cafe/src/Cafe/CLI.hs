@@ -45,7 +45,7 @@ runCLICommand ListMenu = liftIO $ do
   mapM_ printPair (zip [0 :: Int ..] $ map unDrink allDrinks)
 runCLICommand (ViewTab tabId) = do
   uuid <- fromJustNote "Could not find tab with given id" <$> runDB (getTabUuid tabId)
-  StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (serializedProjection tabProjection jsonStringSerializer))
+  StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
   liftIO $ printJSONPretty streamProjectionState
 runCLICommand (TabCommand tabId command) = do
   uuid <- fromJustNote "Could not find tab with given id" <$> runDB (getTabUuid tabId)
@@ -54,14 +54,14 @@ runCLICommand (TabCommand tabId command) = do
       applyCommandHandler
         cliEventStore
         cliEventStoreReader
-        (serializedCommandHandler tabCommandHandler jsonStringSerializer idSerializer)
+        (codecCommandHandler jsonStringCodec idCodec tabCommandHandler)
         uuid
         command
   case result of
-    [] -> liftIO . putStrLn $ "Error! "
-    events -> do
+    Left err -> liftIO . putStrLn $ "Error: " ++ show err
+    Right events -> do
       liftIO . putStrLn $ "Events: " ++ show events
-      StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (serializedProjection tabProjection jsonStringSerializer))
+      StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
       liftIO . putStrLn $ "Latest state:"
       liftIO $ printJSONPretty streamProjectionState
 

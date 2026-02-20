@@ -6,6 +6,7 @@ module Main where
 
 import Control.Concurrent.STM
 import Control.Monad (forever, void)
+import Data.Void (Void, absurd)
 import Eventium
 import Eventium.Store.Memory
 import Safe (readMay)
@@ -36,9 +37,11 @@ readAndHandleCommand writer reader = do
   case readMay input of
     Nothing -> putStrLn "Unknown command"
     (Just command) -> do
-      let events = commandHandlerHandler counterCommandHandler currentState command
-      putStrLn $ "Events generated: " ++ show events
-      void . atomically $ storeEvents writer uuid AnyPosition events
+      case commandHandlerDecide counterCommandHandler currentState command of
+        Right events -> do
+          putStrLn $ "Events generated: " ++ show events
+          void . atomically $ storeEvents writer uuid AnyPosition events
+        Left err -> absurd err
 
   putStrLn ""
 
@@ -76,19 +79,22 @@ data CounterCommand
   deriving (Eq, Show, Read)
 
 -- | This function validates commands and produces either an error or an event.
-handlerCounterCommand :: CounterState -> CounterCommand -> [CounterEvent]
+-- Since this simple counter never rejects commands, the error type is 'Void'.
+handlerCounterCommand :: CounterState -> CounterCommand -> Either Void [CounterEvent]
 handlerCounterCommand (CounterState k) (IncrementCounter n) =
-  if k + n <= 100
-    then [CounterAmountAdded n]
-    else [CounterOutOfBounds (k + n)]
+  Right $
+    if k + n <= 100
+      then [CounterAmountAdded n]
+      else [CounterOutOfBounds (k + n)]
 handlerCounterCommand (CounterState k) (DecrementCounter n) =
-  if k - n >= 0
-    then [CounterAmountAdded (-n)]
-    else [CounterOutOfBounds (k - n)]
-handlerCounterCommand (CounterState k) ResetCounter = [CounterAmountAdded (-k)]
+  Right $
+    if k - n >= 0
+      then [CounterAmountAdded (-n)]
+      else [CounterOutOfBounds (k - n)]
+handlerCounterCommand (CounterState k) ResetCounter = Right [CounterAmountAdded (-k)]
 
 -- | This ties all of the counter types into a CommandHandler.
-type CounterCommandHandler = CommandHandler CounterState CounterEvent CounterCommand
+type CounterCommandHandler = CommandHandler CounterState CounterEvent CounterCommand Void
 
 counterCommandHandler :: CounterCommandHandler
 counterCommandHandler = CommandHandler handlerCounterCommand counterProjection

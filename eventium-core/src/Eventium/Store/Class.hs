@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Eventium.Store.Class
   ( -- * EventStore
@@ -10,39 +7,41 @@ module Eventium.Store.Class
     VersionedEventStoreReader,
     GlobalEventStoreReader,
     VersionedEventStoreWriter,
-    StreamEvent (..),
-    VersionedStreamEvent,
-    GlobalStreamEvent,
-    ExpectedPosition (..),
-    EventWriteError (..),
     runEventStoreReaderUsing,
     runEventStoreWriterUsing,
     module Eventium.Store.Queries,
+    module Eventium.Store.Types,
 
-    -- * Serialization
-    serializedEventStoreReader,
-    serializedVersionedEventStoreReader,
-    serializedGlobalEventStoreReader,
-    serializedEventStoreWriter,
+    -- * Codec
+    codecEventStoreReader,
+    lenientCodecEventStoreReader,
+    codecVersionedEventStoreReader,
+    codecGlobalEventStoreReader,
+    codecEventStoreWriter,
+    metadataEnrichingEventStoreWriter,
+    tagEvents,
 
-    -- * Utility types
-    EventVersion (..),
-    SequenceNumber (..),
+    -- * Type embedding
+    embeddedEventStoreWriter,
 
     -- * Utility functions
     transactionalExpectedWriteHelper,
   )
 where
 
-import Data.Aeson
+import Control.Exception (throw)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Functor ((<&>))
 import Data.Functor.Contravariant
 import Data.Maybe (mapMaybe)
-import Eventium.Serializer
+import qualified Data.Text as T
+import Data.Time (UTCTime, getCurrentTime)
+import Data.Typeable (Typeable, typeOf)
+import Eventium.Codec
 import Eventium.Store.Queries
+import Eventium.Store.Types
+import Eventium.TypeEmbedding
 import Eventium.UUID
-import Web.HttpApiData
-import Web.PathPieces
 
 -- | An 'EventStoreReader' is a function to query a stream from an event store.
 -- It operates in some monad @m@ and returns events of type @event@ from a
@@ -62,41 +61,9 @@ newtype EventStoreWriter key position m event
   = EventStoreWriter {storeEvents :: key -> ExpectedPosition position -> [event] -> m (Either (EventWriteError position) EventVersion)}
 
 instance Contravariant (EventStoreWriter key position m) where
-  contramap f (EventStoreWriter writer) = EventStoreWriter $ \vers uuid -> writer vers uuid . fmap f
+  contramap f (EventStoreWriter writer) = EventStoreWriter $ \key expectedPos -> writer key expectedPos . fmap f
 
 type VersionedEventStoreWriter = EventStoreWriter UUID EventVersion
-
--- | An event along with the @key@ for the event stream it is from and its
--- @position@ in that event stream.
-data StreamEvent key position event
-  = StreamEvent
-  { streamEventKey :: !key,
-    streamEventPosition :: !position,
-    streamEventEvent :: !event
-  }
-  deriving (Show, Eq, Functor, Foldable, Traversable)
-
-type VersionedStreamEvent event = StreamEvent UUID EventVersion event
-
-type GlobalStreamEvent event = StreamEvent () SequenceNumber (VersionedStreamEvent event)
-
--- | ExpectedPosition is used to assert the event stream is at a certain
--- position. This is used when multiple writers are concurrently writing to the
--- event store. If the expected position is incorrect, then storing fails.
-data ExpectedPosition position
-  = -- | Used when the writer doesn't care what position the stream is at.
-    AnyPosition
-  | -- | The stream shouldn't exist yet.
-    NoStream
-  | -- | The stream should already exist.
-    StreamExists
-  | -- | Used to assert the stream is at a particular position.
-    ExactPosition position
-  deriving (Show, Eq)
-
-newtype EventWriteError position
-  = EventStreamNotAtExpectedVersion position
-  deriving (Show, Eq)
 
 -- | Helper to create 'storeEventsRaw' given a function to get the latest
 -- stream version and a function to write to the event store. **NOTE**: This
@@ -146,74 +113,114 @@ runEventStoreReaderUsing runStore (EventStoreReader f) = EventStoreReader (runSt
 runEventStoreWriterUsing ::
   (Monad m, Monad mstore) =>
   (forall a. mstore a -> m a) ->
-  EventStoreWriter key posirion mstore event ->
-  EventStoreWriter key posirion m event
-runEventStoreWriterUsing runStore (EventStoreWriter f) =
-  EventStoreWriter $ \vers uuid events -> runStore $ f vers uuid events
-
--- | Wraps an 'EventStoreReader' and transparently serializes/deserializes
--- events for you. Note that in this implementation deserialization errors are
--- simply ignored (the event is not returned).
-serializedEventStoreReader ::
-  (Monad m) =>
-  Serializer event serialized ->
-  EventStoreReader key position m serialized ->
-  EventStoreReader key position m event
-serializedEventStoreReader Serializer {..} (EventStoreReader reader) =
-  EventStoreReader $ fmap (mapMaybe deserialize) . reader
-
--- | Convenience wrapper around 'serializedEventStoreReader' for
--- 'VersionedEventStoreReader'.
-serializedVersionedEventStoreReader ::
-  (Monad m) =>
-  Serializer event serialized ->
-  VersionedEventStoreReader m serialized ->
-  VersionedEventStoreReader m event
-serializedVersionedEventStoreReader serializer = serializedEventStoreReader (traverseSerializer serializer)
-
--- | Convenience wrapper around 'serializedEventStoreReader' for
--- 'GlobalEventStoreReader'.
-serializedGlobalEventStoreReader ::
-  (Monad m) =>
-  Serializer event serialized ->
-  GlobalEventStoreReader m serialized ->
-  GlobalEventStoreReader m event
-serializedGlobalEventStoreReader serializer = serializedEventStoreReader (traverseSerializer (traverseSerializer serializer))
-
--- | Like 'serializedEventStoreReader' but for an 'EventStoreWriter'. Note that
--- 'EventStoreWriter' is an instance of 'Contravariant', so you can just use
--- @contramap serialize@ instead of this function.
-serializedEventStoreWriter ::
-  (Monad m) =>
-  Serializer event serialized ->
-  EventStoreWriter key position m serialized ->
+  EventStoreWriter key position mstore event ->
   EventStoreWriter key position m event
-serializedEventStoreWriter Serializer {..} = contramap serialize
+runEventStoreWriterUsing runStore (EventStoreWriter f) =
+  EventStoreWriter $ \key expectedPos events -> runStore $ f key expectedPos events
 
--- | Event versions are a strictly increasing series of integers for each
--- projection. They allow us to order the events when they are replayed, and
--- they also help as a concurrency check in a multi-threaded environment so
--- services modifying the projection can be sure the projection didn't change
--- during their execution.
-newtype EventVersion = EventVersion {unEventVersion :: Int}
-  deriving (Show, Read, Ord, Eq, Enum, Num, FromJSON, ToJSON)
+-- | Wraps an 'EventStoreReader' and transparently decodes events.
+-- Throws 'DecodeError' if any event fails to decode.
+-- Use 'lenientCodecEventStoreReader' to silently skip failures.
+codecEventStoreReader ::
+  (Monad m) =>
+  Codec event encoded ->
+  EventStoreReader key position m encoded ->
+  EventStoreReader key position m event
+codecEventStoreReader codec (EventStoreReader reader) =
+  EventStoreReader $ fmap (map strictDecode) . reader
+  where
+    strictDecode s = case decode codec s of
+      Just a -> a
+      Nothing -> throw $ DecodeError "codecEventStoreReader" "Failed to decode event"
 
--- | The sequence number gives us a global ordering of events in a particular
--- event store. Using sequence numbers is not strictly necessary for an event
--- sourcing and CQRS system, but it makes it way easier to replay events
--- consistently without having to use distributed transactions in an event bus.
--- In SQL-based event stores, they are also very cheap to create.
-newtype SequenceNumber = SequenceNumber {unSequenceNumber :: Int}
-  deriving
-    ( Show,
-      Read,
-      Ord,
-      Eq,
-      Enum,
-      Num,
-      FromJSON,
-      ToJSON,
-      PathPiece,
-      ToHttpApiData,
-      FromHttpApiData
-    )
+-- | Like 'codecEventStoreReader' but silently drops events that fail
+-- to decode.
+--
+-- Recommended for production use when using sum-type codecs, as it
+-- allows readers to gracefully handle events they don't recognize.
+lenientCodecEventStoreReader ::
+  (Monad m) =>
+  Codec event encoded ->
+  EventStoreReader key position m encoded ->
+  EventStoreReader key position m event
+lenientCodecEventStoreReader codec (EventStoreReader reader) =
+  EventStoreReader $ fmap (mapMaybe (decode codec)) . reader
+
+-- | Convenience wrapper around 'codecEventStoreReader' for
+-- 'VersionedEventStoreReader'.
+codecVersionedEventStoreReader ::
+  (Monad m) =>
+  Codec event encoded ->
+  VersionedEventStoreReader m encoded ->
+  VersionedEventStoreReader m event
+codecVersionedEventStoreReader codec = codecEventStoreReader (traverseCodec codec)
+
+-- | Convenience wrapper around 'codecEventStoreReader' for
+-- 'GlobalEventStoreReader'.
+codecGlobalEventStoreReader ::
+  (Monad m) =>
+  Codec event encoded ->
+  GlobalEventStoreReader m encoded ->
+  GlobalEventStoreReader m event
+codecGlobalEventStoreReader codec = codecEventStoreReader (traverseCodec (traverseCodec codec))
+
+-- | Like 'codecEventStoreReader' but for an 'EventStoreWriter'. Note that
+-- 'EventStoreWriter' is an instance of 'Contravariant', so you can just use
+-- @contramap (encode codec)@ instead of this function.
+codecEventStoreWriter ::
+  Codec event encoded ->
+  EventStoreWriter key position m encoded ->
+  EventStoreWriter key position m event
+codecEventStoreWriter codec = contramap (encode codec)
+
+-- | Wraps an 'EventStoreWriter' that accepts 'TaggedEvent's, producing a
+-- writer that accepts domain events. Each event is encoded and tagged
+-- with metadata (event type name derived from 'Typeable', current
+-- UTC timestamp).
+--
+-- Use this instead of 'codecEventStoreWriter' when you want metadata
+-- to be populated. The underlying writer must accept 'TaggedEvent's.
+--
+-- @
+-- writer = metadataEnrichingEventStoreWriter myCodec taggedStore
+-- @
+metadataEnrichingEventStoreWriter ::
+  (MonadIO m, Typeable event) =>
+  Codec event encoded ->
+  EventStoreWriter key position m (TaggedEvent encoded) ->
+  EventStoreWriter key position m event
+metadataEnrichingEventStoreWriter codec (EventStoreWriter write) =
+  EventStoreWriter $ \key pos events -> do
+    now <- liftIO getCurrentTime
+    let tagged =
+          map
+            ( \e ->
+                TaggedEvent
+                  (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
+                  (encode codec e)
+            )
+            events
+    write key pos tagged
+
+-- | Tag events with metadata in a pure context. The caller supplies
+-- the current time. Useful when 'MonadIO' is not available.
+tagEvents ::
+  (Typeable event) =>
+  Codec event encoded ->
+  UTCTime ->
+  [event] ->
+  [TaggedEvent encoded]
+tagEvents codec now =
+  map $ \e ->
+    TaggedEvent
+      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
+      (encode codec e)
+
+-- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of
+-- a 'Codec'. Intended for embedding aggregate-specific event types into
+-- an application-wide event sum type before writing to the store.
+embeddedEventStoreWriter ::
+  TypeEmbedding event adapted ->
+  EventStoreWriter key position m adapted ->
+  EventStoreWriter key position m event
+embeddedEventStoreWriter emb = contramap (embed emb)

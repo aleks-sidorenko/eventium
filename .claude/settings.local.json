@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(nix develop:*)",
+      "Bash(just hpack:*)",
+      "Bash(just build:*)",
+      "Bash(cabal test:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(cat:*)",
+      "Bash(xargs basename:*)",
+      "Skill(superpowers:executing-plans)",
+      "Bash(cabal build:*)",
+      "Skill(superpowers:brainstorming)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

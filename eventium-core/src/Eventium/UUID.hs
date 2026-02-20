@@ -49,6 +49,8 @@ instance PathPiece UUID where
   fromPathPiece = uuidFromText
   toPathPiece = uuidToText
 
+-- TODO: move to testing package
+
 -- | Constructs a valid 'UUID' from an 'Integer' by padding with zeros. Useful
 -- for testing.
 --

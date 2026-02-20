@@ -7,6 +7,8 @@ module Bank.Models.Account.Commands
     DebitAccount (..),
     TransferToAccount (..),
     AcceptTransfer (..),
+    CompleteTransfer (..),
+    RejectTransfer (..),
   )
 where
 
@@ -20,7 +22,9 @@ accountCommands =
     ''CreditAccount,
     ''DebitAccount,
     ''TransferToAccount,
-    ''AcceptTransfer
+    ''AcceptTransfer,
+    ''CompleteTransfer,
+    ''RejectTransfer
   ]
 
 data OpenAccount
@@ -60,8 +64,23 @@ data AcceptTransfer
   }
   deriving (Show, Eq)
 
+newtype CompleteTransfer
+  = CompleteTransfer
+  { completeTransferTransferId :: UUID
+  }
+  deriving (Show, Eq)
+
+data RejectTransfer
+  = RejectTransfer
+  { rejectTransferTransferId :: UUID,
+    rejectTransferReason :: String
+  }
+  deriving (Show, Eq)
+
 deriveJSONUnPrefixLower ''OpenAccount
 deriveJSONUnPrefixLower ''CreditAccount
 deriveJSONUnPrefixLower ''DebitAccount
 deriveJSONUnPrefixLower ''TransferToAccount
 deriveJSONUnPrefixLower ''AcceptTransfer
+deriveJSONUnPrefixLower ''CompleteTransfer
+deriveJSONUnPrefixLower ''RejectTransfer
