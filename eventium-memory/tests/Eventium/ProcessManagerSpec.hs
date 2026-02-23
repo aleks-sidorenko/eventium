@@ -120,3 +120,45 @@ spec = do
 
       dispatched <- readIORef dispatchedRef
       dispatched `shouldBe` [(target, AcceptCredit 50)]
+
+    it "should execute compensation on command failure" $ do
+      dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
+      let target1 = uuidFromInteger 1
+          target2 = uuidFromInteger 2
+          dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+            modifyIORef dispatchedRef (++ [(uuid, cmd)])
+            if uuid == target1
+              then pure (CommandFailed "rejected")
+              else pure CommandSucceeded
+
+      let effects =
+            [ IssueCommandWithCompensation
+                target1
+                (AcceptCredit 50)
+                (\_ -> [IssueCommand target2 (AcceptCredit 0)])
+            ]
+
+      runProcessManagerEffects dispatcher effects
+
+      dispatched <- readIORef dispatchedRef
+      dispatched `shouldBe` [(target1, AcceptCredit 50), (target2, AcceptCredit 0)]
+
+    it "should NOT execute compensation on command success" $ do
+      dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
+      let target1 = uuidFromInteger 1
+          target2 = uuidFromInteger 2
+          dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+            modifyIORef dispatchedRef (++ [(uuid, cmd)])
+            pure CommandSucceeded
+
+      let effects =
+            [ IssueCommandWithCompensation
+                target1
+                (AcceptCredit 50)
+                (\_ -> [IssueCommand target2 (AcceptCredit 0)])
+            ]
+
+      runProcessManagerEffects dispatcher effects
+
+      dispatched <- readIORef dispatchedRef
+      dispatched `shouldBe` [(target1, AcceptCredit 50)]

@@ -48,7 +48,22 @@ data ProcessManager state event command = ProcessManager
 data ProcessManagerEffect command
   = -- | Issue a command to a specific aggregate (identified by 'UUID').
     IssueCommand UUID command
-  deriving (Show, Eq)
+  | -- | Issue a command with compensation: if the command fails, execute
+    -- the compensation effects produced by the failure handler.
+    --
+    -- The 'Text' argument to the compensation function is the failure reason
+    -- from 'CommandFailed'.
+    IssueCommandWithCompensation UUID command (Text -> [ProcessManagerEffect command])
+
+instance (Show command) => Show (ProcessManagerEffect command) where
+  show (IssueCommand uuid cmd) = "IssueCommand " ++ show uuid ++ " " ++ show cmd
+  show (IssueCommandWithCompensation uuid cmd _) =
+    "IssueCommandWithCompensation " ++ show uuid ++ " " ++ show cmd ++ " <compensation>"
+
+instance (Eq command) => Eq (ProcessManagerEffect command) where
+  IssueCommand u1 c1 == IssueCommand u2 c2 = u1 == u2 && c1 == c2
+  IssueCommandWithCompensation u1 c1 _ == IssueCommandWithCompensation u2 c2 _ = u1 == u2 && c1 == c2
+  _ == _ = False
 
 -- | Result of dispatching a command to an aggregate.
 data CommandDispatchResult
@@ -93,6 +108,11 @@ runProcessManagerEffects dispatcher = mapM_ go
   where
     go (IssueCommand uuid cmd) =
       void $ dispatchCommand dispatcher uuid cmd
+    go (IssueCommandWithCompensation uuid cmd onFailure) = do
+      result <- dispatchCommand dispatcher uuid cmd
+      case result of
+        CommandSucceeded -> pure ()
+        CommandFailed reason -> mapM_ go (onFailure reason)
 
 -- | Create an 'EventHandler' that wires a 'ProcessManager' to a global
 -- event store reader and a command dispatcher.
