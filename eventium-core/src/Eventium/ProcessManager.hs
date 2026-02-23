@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 -- | Defines a Process Manager (saga) abstraction for orchestrating
 -- interactions across multiple event streams.
 --
@@ -13,10 +15,13 @@ module Eventium.ProcessManager
   ( ProcessManager (..),
     ProcessManagerEffect (..),
     runProcessManagerEffects,
+    processManagerEventHandler,
   )
 where
 
+import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
+import Eventium.Store.Class (GlobalEventStoreReader)
 import Eventium.Store.Types
 import Eventium.UUID
 
@@ -53,3 +58,23 @@ runProcessManagerEffects ::
 runProcessManagerEffects dispatch = mapM_ go
   where
     go (IssueCommand uuid cmd) = dispatch uuid cmd
+
+-- | Create an 'EventHandler' that wires a 'ProcessManager' to a global
+-- event store reader and a command dispatcher.
+--
+-- For each incoming event:
+--
+--   1. Rebuilds the process manager state from the global event stream
+--   2. Calls 'processManagerReact' with the current state and the new event
+--   3. Executes the resulting effects via the dispatcher
+processManagerEventHandler ::
+  (Monad m) =>
+  ProcessManager state event command ->
+  GlobalEventStoreReader m event ->
+  (UUID -> command -> m ()) ->
+  EventHandler m (VersionedStreamEvent event)
+processManagerEventHandler pm globalReader dispatch = EventHandler $ \event -> do
+  let globalProjection = globalStreamProjection (processManagerProjection pm)
+  StreamProjection {..} <- getLatestStreamProjection globalReader globalProjection
+  let effects = processManagerReact pm streamProjectionState event
+  runProcessManagerEffects dispatch effects

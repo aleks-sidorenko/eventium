@@ -94,8 +94,9 @@ codecCommandHandler eventCodec commandCodec (CommandHandler commandHandler proje
 -- types into application-wide sum types.
 --
 -- The projection uses lenient extraction (non-matching events are skipped).
--- Command extraction throws 'DecodeError' on failure, since
--- receiving an unrecognized command is a programming error.
+-- Non-matching commands return @'Right' []@ (no events produced), which
+-- enables safe multi-aggregate command dispatching — callers can try
+-- multiple embedded handlers in sequence without catching exceptions.
 embeddedCommandHandler ::
   TypeEmbedding event adaptedEvent ->
   TypeEmbedding command adaptedCommand ->
@@ -107,5 +108,5 @@ embeddedCommandHandler eventEmb commandEmb (CommandHandler commandHandler projec
     embeddedProjection' = embeddedProjection eventEmb projection
     embeddedHandler state adaptedCmd =
       case extract commandEmb adaptedCmd of
-        Nothing -> throw $ DecodeError "embeddedCommandHandler" "Command type does not match embedding"
+        Nothing -> Right []
         Just cmd -> fmap (map (embed eventEmb)) (commandHandler state cmd)
