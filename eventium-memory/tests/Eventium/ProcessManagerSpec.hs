@@ -135,7 +135,7 @@ spec = do
             [ IssueCommandWithCompensation
                 target1
                 (AcceptCredit 50)
-                (\_ -> [IssueCommand target2 (AcceptCredit 0)])
+                (const [IssueCommand target2 (AcceptCredit 0)])
             ]
 
       runProcessManagerEffects dispatcher effects
@@ -155,7 +155,7 @@ spec = do
             [ IssueCommandWithCompensation
                 target1
                 (AcceptCredit 50)
-                (\_ -> [IssueCommand target2 (AcceptCredit 0)])
+                (const [IssueCommand target2 (AcceptCredit 0)])
             ]
 
       runProcessManagerEffects dispatcher effects
