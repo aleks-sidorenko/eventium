@@ -76,19 +76,19 @@ spec = do
   describe "runProcessManagerEffects" $ do
     it "should dispatch commands via the dispatch function" $ do
       dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
-      let dispatch uuid cmd = modifyIORef dispatchedRef (++ [(uuid, cmd)])
+      let dispatcher = fireAndForgetDispatcher $ \uuid cmd -> modifyIORef dispatchedRef (++ [(uuid, cmd)])
 
       let target = uuidFromInteger 2
           effects = [IssueCommand target (AcceptCredit 50)]
 
-      runProcessManagerEffects dispatch effects
+      runProcessManagerEffects dispatcher effects
 
       dispatched <- readIORef dispatchedRef
       dispatched `shouldBe` [(target, AcceptCredit 50)]
 
     it "should execute multiple commands in order" $ do
       dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
-      let dispatch uuid cmd = modifyIORef dispatchedRef (++ [(uuid, cmd)])
+      let dispatcher = fireAndForgetDispatcher $ \uuid cmd -> modifyIORef dispatchedRef (++ [(uuid, cmd)])
 
       let target1 = uuidFromInteger 1
           target2 = uuidFromInteger 2
@@ -98,7 +98,7 @@ spec = do
               IssueCommand target1 (AcceptCredit 25)
             ]
 
-      runProcessManagerEffects dispatch effects
+      runProcessManagerEffects dispatcher effects
 
       dispatched <- readIORef dispatchedRef
       dispatched
@@ -106,3 +106,17 @@ spec = do
                      (target2, AcceptCredit 100),
                      (target1, AcceptCredit 25)
                    ]
+
+    it "should dispatch commands via CommandDispatcher" $ do
+      dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
+      let dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+            modifyIORef dispatchedRef (++ [(uuid, cmd)])
+            pure CommandSucceeded
+
+      let target = uuidFromInteger 2
+          effects = [IssueCommand target (AcceptCredit 50)]
+
+      runProcessManagerEffects dispatcher effects
+
+      dispatched <- readIORef dispatchedRef
+      dispatched `shouldBe` [(target, AcceptCredit 50)]

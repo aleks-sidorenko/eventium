@@ -14,11 +14,17 @@
 module Eventium.ProcessManager
   ( ProcessManager (..),
     ProcessManagerEffect (..),
+    CommandDispatchResult (..),
+    CommandDispatcher (..),
+    mkCommandDispatcher,
+    fireAndForgetDispatcher,
     runProcessManagerEffects,
     processManagerEventHandler,
   )
 where
 
+import Control.Monad (void)
+import Data.Text (Text)
 import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
 import Eventium.Store.Class (GlobalEventStoreReader)
@@ -44,20 +50,49 @@ data ProcessManagerEffect command
     IssueCommand UUID command
   deriving (Show, Eq)
 
--- | Execute a list of 'ProcessManagerEffect's using the provided command
--- dispatcher.
+-- | Result of dispatching a command to an aggregate.
+data CommandDispatchResult
+  = -- | The command was accepted and events were stored.
+    CommandSucceeded
+  | -- | The command was rejected by the aggregate with a reason.
+    CommandFailed Text
+  deriving (Show, Eq)
+
+-- | A command dispatcher routes commands to aggregates and reports the outcome.
 --
--- The command dispatcher is a plain function @UUID -> command -> m ()@
--- rather than a newtype, since commands are point-to-point (no fan-out)
--- and only used here.
-runProcessManagerEffects ::
+-- Use 'mkCommandDispatcher' to construct one from a dispatch function.
+-- Use 'fireAndForgetDispatcher' to adapt a legacy @UUID -> command -> m ()@
+-- callback that does not report failures.
+newtype CommandDispatcher m command = CommandDispatcher
+  { dispatchCommand :: UUID -> command -> m CommandDispatchResult
+  }
+
+-- | Construct a 'CommandDispatcher' from a dispatch function.
+mkCommandDispatcher ::
+  (UUID -> command -> m CommandDispatchResult) ->
+  CommandDispatcher m command
+mkCommandDispatcher = CommandDispatcher
+
+-- | Adapt a legacy fire-and-forget dispatcher into a 'CommandDispatcher'
+-- that always reports 'CommandSucceeded'.
+fireAndForgetDispatcher ::
   (Monad m) =>
   (UUID -> command -> m ()) ->
+  CommandDispatcher m command
+fireAndForgetDispatcher f = CommandDispatcher $ \uuid cmd ->
+  f uuid cmd >> pure CommandSucceeded
+
+-- | Execute a list of 'ProcessManagerEffect's using the provided
+-- 'CommandDispatcher'.
+runProcessManagerEffects ::
+  (Monad m) =>
+  CommandDispatcher m command ->
   [ProcessManagerEffect command] ->
   m ()
-runProcessManagerEffects dispatch = mapM_ go
+runProcessManagerEffects dispatcher = mapM_ go
   where
-    go (IssueCommand uuid cmd) = dispatch uuid cmd
+    go (IssueCommand uuid cmd) =
+      void $ dispatchCommand dispatcher uuid cmd
 
 -- | Create an 'EventHandler' that wires a 'ProcessManager' to a global
 -- event store reader and a command dispatcher.
@@ -71,10 +106,10 @@ processManagerEventHandler ::
   (Monad m) =>
   ProcessManager state event command ->
   GlobalEventStoreReader m event ->
-  (UUID -> command -> m ()) ->
+  CommandDispatcher m command ->
   EventHandler m (VersionedStreamEvent event)
-processManagerEventHandler pm globalReader dispatch = EventHandler $ \event -> do
+processManagerEventHandler pm globalReader dispatcher = EventHandler $ \event -> do
   let globalProjection = globalStreamProjection (processManagerProjection pm)
   StreamProjection {..} <- getLatestStreamProjection globalReader globalProjection
   let effects = processManagerReact pm streamProjectionState event
-  runProcessManagerEffects dispatch effects
+  runProcessManagerEffects dispatcher effects
