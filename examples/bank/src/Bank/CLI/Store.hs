@@ -41,7 +41,7 @@ runTransferManager newEvent = do
       globalProjection = globalStreamProjection projection
   StreamProjection {..} <- getLatestStreamProjection cliGlobalEventStoreReader globalProjection
   let effects = processManagerReact transferProcessManager streamProjectionState newEvent
-      dispatch uuid cmd = do
+      dispatch = fireAndForgetDispatcher $ \uuid cmd -> do
         _ <- applyCommandHandler cliEventStoreWriter cliEventStoreReader accountBankCommandHandler uuid cmd
         return ()
   runProcessManagerEffects dispatch effects
