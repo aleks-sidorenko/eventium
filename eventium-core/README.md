@@ -65,11 +65,25 @@ data ProcessManager state event command = ProcessManager
                              -> [ProcessManagerEffect command]
   }
 
-newtype ProcessManagerEffect command
+data ProcessManagerEffect command
   = IssueCommand UUID command
+  | IssueCommandWithCompensation UUID command (Text -> [ProcessManagerEffect command])
 ```
 
-Coordinates cross-aggregate workflows. `react` is pure; `runProcessManagerEffects` dispatches the resulting commands.
+Coordinates cross-aggregate workflows. `react` is pure; `runProcessManagerEffects` dispatches the resulting commands via a `CommandDispatcher`. `IssueCommandWithCompensation` triggers compensation effects when a command fails.
+
+### CommandDispatcher
+
+```haskell
+newtype CommandDispatcher m command = CommandDispatcher
+  { dispatchCommand :: UUID -> command -> m CommandDispatchResult }
+
+data CommandDispatchResult = CommandSucceeded | CommandFailed Text
+```
+
+Routes commands to aggregates and reports outcomes. Construct with `mkCommandDispatcher`, or use `fireAndForgetDispatcher` for legacy callbacks. `commandHandlerDispatcher` (from `Eventium.CommandDispatcher`) builds a dispatcher from a list of `AggregateHandler`s for multi-aggregate routing.
+
+`processManagerEventHandler` wires a `ProcessManager` to a global reader and dispatcher, producing a ready-to-use `EventHandler`.
 
 ### EventHandler / EventPublisher / EventSubscription
 
@@ -108,7 +122,8 @@ Embeds one sum type into another (e.g. aggregate events into an application-wide
 | `Eventium.Store.Queries` | `QueryRange` builders (`allEvents`, `eventsStartingAt`, etc.) |
 | `Eventium.Projection` | `Projection`, `StreamProjection`, `getLatestStreamProjection` |
 | `Eventium.CommandHandler` | `CommandHandler`, `applyCommandHandler` |
-| `Eventium.ProcessManager` | `ProcessManager`, `ProcessManagerEffect`, `runProcessManagerEffects` |
+| `Eventium.ProcessManager` | `ProcessManager`, `ProcessManagerEffect`, `CommandDispatcher`, `CommandDispatchResult`, `runProcessManagerEffects`, `processManagerEventHandler` |
+| `Eventium.CommandDispatcher` | `AggregateHandler`, `mkAggregateHandler`, `commandHandlerDispatcher` |
 | `Eventium.EventHandler` | `EventHandler`, `handleEvents` |
 | `Eventium.EventPublisher` | `EventPublisher`, `publishingEventStoreWriter`, `synchronousPublisher` |
 | `Eventium.EventSubscription` | `EventSubscription`, `pollingSubscription`, `CheckpointStore` |

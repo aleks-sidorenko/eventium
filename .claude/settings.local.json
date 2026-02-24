@@ -11,7 +11,17 @@
       "Bash(xargs basename:*)",
       "Skill(superpowers:executing-plans)",
       "Bash(cabal build:*)",
-      "Skill(superpowers:brainstorming)"
+      "Skill(superpowers:brainstorming)",
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(hlint:*)",
+      "Bash(just format:*)",
+      "Bash(ghc:*)"
     ],
     "deny": [],
     "ask": []

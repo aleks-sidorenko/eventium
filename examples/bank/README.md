@@ -30,10 +30,28 @@ The `reactTransfer` function is pure -- it returns `[ProcessManagerEffect]`:
 ```haskell
 reactTransfer :: TransferManager -> VersionedStreamEvent BankEvent
               -> [ProcessManagerEffect BankCommand]
--- Returns IssueCommand values
 ```
 
-`runProcessManagerEffects` dispatches the resulting commands.
+Uses `IssueCommandWithCompensation` for the transfer credit step: if the target
+account rejects the credit, compensation automatically issues a
+`RejectTransferCommand` back to the source account.
+
+### Command Dispatcher
+
+The bank wires its aggregates using `commandHandlerDispatcher` for list-based
+command routing:
+
+```haskell
+dispatcher =
+  commandHandlerDispatcher
+    cliEventStoreWriter
+    cliEventStoreReader
+    [mkAggregateHandler accountBankCommandHandler formatAccountError]
+```
+
+`processManagerEventHandler` connects the transfer process manager to the
+dispatcher, producing an `EventHandler` that plugs directly into the
+`EventPublisher`.
 
 ### Event Publishing
 
@@ -45,7 +63,8 @@ cliEventStoreWriter =
   publishingEventStoreWriter writer (synchronousPublisher eventHandler)
 ```
 
-The event handler prints events and triggers the transfer process manager.
+The event handler prints events and triggers the transfer process manager via
+`processManagerEventHandler`.
 
 ### Read Models
 
@@ -65,12 +84,13 @@ Commands -> CommandHandler -> events table (SQLite)
                                    |
                      EventHandler (fan-out via <>)
                            |              |
-                     Print events    TransferManager
-                                    (ProcessManager)
+                     Print events    processManagerEventHandler
+                                    (TransferManager)
                                            |
-                                 runProcessManagerEffects
-                                         |
-                                    IssueCommand
+                                  CommandDispatcher
+                                 (commandHandlerDispatcher)
+                                           |
+                              IssueCommand / IssueCommandWithCompensation
 ```
 
 ## Code Structure

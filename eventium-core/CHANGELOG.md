@@ -19,6 +19,14 @@ See the [root changelog](../CHANGELOG.md) for full details.
 - `EventMetadata`, `emptyMetadata`.
 - `lenientCodecEventStoreReader`, `lenientCodecProjection`.
 - `runProjectionSubscription`, `eventHandlerMapMaybe`.
+- `CommandDispatcher` newtype with `mkCommandDispatcher` and `fireAndForgetDispatcher`.
+- `CommandDispatchResult` (`CommandSucceeded` | `CommandFailed Text`).
+- `IssueCommandWithCompensation` effect for saga compensation workflows.
+- `processManagerEventHandler` for wiring a `ProcessManager` to an `EventHandler`.
+- `Eventium.CommandDispatcher` module: `AggregateHandler`, `mkAggregateHandler`,
+  `commandHandlerDispatcher` for list-based multi-aggregate command routing.
+- `embeddedCommandHandler` returns `Right []` for non-matching commands
+  (was `DecodeError` exception).
 
 ## 0.1.0
 
