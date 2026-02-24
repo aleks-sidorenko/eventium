@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Bank.CLI.Store
   ( runDB,
     cliEventStoreReader,
@@ -34,16 +36,16 @@ cliEventStoreWriter =
       commandHandlerDispatcher
         cliEventStoreWriter
         cliEventStoreReader
-        [mkAggregateHandler accountBankCommandHandler formatAccountError]
+        [mkAggregateHandlerWith formatAccountError accountBankCommandHandler]
     eventHandler =
       EventHandler (\event -> liftIO $ printJSONPretty (streamEventKey event, streamEventEvent event))
         <> processManagerEventHandler transferProcessManager cliGlobalEventStoreReader dispatcher
 
-formatAccountError :: AccountCommandError -> Text
-formatAccountError AccountAlreadyOpen = pack "Account already open"
-formatAccountError InvalidInitialDeposit = pack "Invalid initial deposit"
-formatAccountError (InsufficientFunds balance) = pack $ "Insufficient funds (balance: " ++ show balance ++ ")"
-formatAccountError AccountNotOpen = pack "Account not open"
+formatAccountError :: AccountCommandError -> RejectionReason
+formatAccountError AccountAlreadyOpen = "Account already open"
+formatAccountError InvalidInitialDeposit = "Invalid initial deposit"
+formatAccountError (InsufficientFunds balance) = RejectionReason . pack $ "Insufficient funds (balance: " ++ show balance ++ ")"
+formatAccountError AccountNotOpen = "Account not open"
 
 cliGlobalEventStoreReader :: (MonadIO m) => GlobalEventStoreReader (SqlPersistT m) BankEvent
 cliGlobalEventStoreReader =
