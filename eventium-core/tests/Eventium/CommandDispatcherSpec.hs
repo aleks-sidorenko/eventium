@@ -3,10 +3,9 @@
 module Eventium.CommandDispatcherSpec (spec) where
 
 import Data.IORef
-import Data.Text (Text)
 import Eventium.CommandDispatcher
 import Eventium.CommandHandler
-import Eventium.ProcessManager (CommandDispatchResult (..), dispatchCommand)
+import Eventium.ProcessManager (CommandDispatchResult (..), RejectionReason (..), dispatchCommand)
 import Eventium.Projection
 import Eventium.Store.Class
 import Eventium.UUID
@@ -36,9 +35,6 @@ counterHandler = CommandHandler decide counterProjection
       | otherwise = Right [Decremented]
     decide _ Unknown = Right []
 
-formatCounterError :: CounterError -> Text
-formatCounterError AlreadyZero = "Already at zero"
-
 -- | Simple IORef-based event store for testing.
 mkTestStore :: IO (VersionedEventStoreWriter IO CounterEvent, VersionedEventStoreReader IO CounterEvent)
 mkTestStore = do
@@ -65,7 +61,7 @@ spec = describe "CommandDispatcher" $ do
     it "routes command to matching handler and reports success" $ do
       (writer, reader) <- mkTestStore
 
-      let handlers = [mkAggregateHandler counterHandler formatCounterError]
+      let handlers = [mkAggregateHandler counterHandler]
           dispatcher = commandHandlerDispatcher writer reader handlers
 
       result <- dispatchCommand dispatcher (uuidFromInteger 1) Increment
@@ -74,17 +70,17 @@ spec = describe "CommandDispatcher" $ do
     it "reports failure when command is rejected" $ do
       (writer, reader) <- mkTestStore
 
-      let handlers = [mkAggregateHandler counterHandler formatCounterError]
+      let handlers = [mkAggregateHandler counterHandler]
           dispatcher = commandHandlerDispatcher writer reader handlers
 
       -- Counter starts at 0, Decrement should fail
       result <- dispatchCommand dispatcher (uuidFromInteger 1) Decrement
-      result `shouldBe` CommandFailed "Already at zero"
+      result `shouldBe` CommandFailed (RejectionReason "AlreadyZero")
 
     it "returns CommandSucceeded when no handler matches" $ do
       (writer, reader) <- mkTestStore
 
-      let handlers = [mkAggregateHandler counterHandler formatCounterError]
+      let handlers = [mkAggregateHandler counterHandler]
           dispatcher = commandHandlerDispatcher writer reader handlers
 
       -- Unknown returns Right [], so no handler "matches" (produces events)
