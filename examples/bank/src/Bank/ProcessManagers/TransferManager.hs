@@ -63,7 +63,7 @@ reactTransfer manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEven
                   acceptTransferAmount = accountTransferStartedAmount
                 }
           )
-          ( \reason ->
+          ( \(RejectionReason reason) ->
               [ IssueCommand
                   sourceAccount
                   ( RejectTransferCommand
