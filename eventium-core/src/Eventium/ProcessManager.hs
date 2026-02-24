@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Defines a Process Manager (saga) abstraction for orchestrating
@@ -15,6 +17,7 @@ module Eventium.ProcessManager
   ( ProcessManager (..),
     ProcessManagerEffect (..),
     CommandDispatchResult (..),
+    RejectionReason (..),
     CommandDispatcher (..),
     mkCommandDispatcher,
     fireAndForgetDispatcher,
@@ -24,6 +27,7 @@ module Eventium.ProcessManager
 where
 
 import Control.Monad (void)
+import Data.String (IsString)
 import Data.Text (Text)
 import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
@@ -43,6 +47,13 @@ data ProcessManager state event command = ProcessManager
     processManagerReact :: state -> VersionedStreamEvent event -> [ProcessManagerEffect command]
   }
 
+-- | A typed wrapper for the reason a command was rejected.
+--
+-- Use 'RejectionReason' instead of raw 'Text' to avoid accidentally
+-- mixing rejection reasons with other textual values at the dispatch boundary.
+newtype RejectionReason = RejectionReason {unRejectionReason :: Text}
+  deriving (Show, Eq, Ord, IsString)
+
 -- | A side effect that a 'ProcessManager' wants to perform. This is a pure
 -- data type — it describes /what/ should happen, not /how/.
 data ProcessManagerEffect command
@@ -51,9 +62,9 @@ data ProcessManagerEffect command
   | -- | Issue a command with compensation: if the command fails, execute
     -- the compensation effects produced by the failure handler.
     --
-    -- The 'Text' argument to the compensation function is the failure reason
+    -- The 'RejectionReason' argument to the compensation function is the failure reason
     -- from 'CommandFailed'.
-    IssueCommandWithCompensation UUID command (Text -> [ProcessManagerEffect command])
+    IssueCommandWithCompensation UUID command (RejectionReason -> [ProcessManagerEffect command])
 
 instance (Show command) => Show (ProcessManagerEffect command) where
   show (IssueCommand uuid cmd) = "IssueCommand " ++ show uuid ++ " " ++ show cmd
@@ -70,7 +81,7 @@ data CommandDispatchResult
   = -- | The command was accepted and events were stored.
     CommandSucceeded
   | -- | The command was rejected by the aggregate with a reason.
-    CommandFailed Text
+    CommandFailed RejectionReason
   deriving (Show, Eq)
 
 -- | A command dispatcher routes commands to aggregates and reports the outcome.
