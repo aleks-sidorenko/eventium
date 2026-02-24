@@ -14,6 +14,7 @@ import Control.Lens
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
+import qualified Data.Text as T
 import Eventium
 
 newtype TransferManager
@@ -53,7 +54,7 @@ handleTransferEvent manager _ = manager
 reactTransfer :: TransferManager -> VersionedStreamEvent BankEvent -> [ProcessManagerEffect BankCommand]
 reactTransfer manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEvent AccountTransferStarted {..}))
   | isNothing (manager ^. transferManagerData . at accountTransferStartedTransferId) =
-      [ IssueCommand
+      [ IssueCommandWithCompensation
           accountTransferStartedTargetAccount
           ( AcceptTransferCommand
               AcceptTransfer
@@ -61,6 +62,17 @@ reactTransfer manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEven
                   acceptTransferSourceAccount = sourceAccount,
                   acceptTransferAmount = accountTransferStartedAmount
                 }
+          )
+          ( \reason ->
+              [ IssueCommand
+                  sourceAccount
+                  ( RejectTransferCommand
+                      RejectTransfer
+                        { rejectTransferTransferId = accountTransferStartedTransferId,
+                          rejectTransferReason = T.unpack reason
+                        }
+                  )
+              ]
           )
       ]
   | otherwise = []
