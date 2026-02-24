@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Provides list-based command routing for multi-aggregate systems.
 --
@@ -8,14 +9,14 @@
 module Eventium.CommandDispatcher
   ( AggregateHandler,
     mkAggregateHandler,
+    mkAggregateHandlerWith,
     commandHandlerDispatcher,
   )
 where
 
-import Data.Text (Text)
 import qualified Data.Text as T
 import Eventium.CommandHandler (CommandHandler, CommandHandlerError (..), applyCommandHandler)
-import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher, mkCommandDispatcher)
+import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher, RejectionReason (..), mkCommandDispatcher)
 import Eventium.Store.Class (VersionedEventStoreReader, VersionedEventStoreWriter)
 
 -- | An embedded command handler paired with an error formatter.
@@ -26,15 +27,21 @@ data AggregateHandler event command
   = forall state err.
     AggregateHandler
       (CommandHandler state event command err)
-      (err -> Text)
+      (err -> RejectionReason)
 
--- | Construct an 'AggregateHandler' from a command handler and an error
--- formatting function.
+-- | Construct an 'AggregateHandler' using 'Show' to format errors.
 mkAggregateHandler ::
+  (Show err) =>
   CommandHandler state event command err ->
-  (err -> Text) ->
   AggregateHandler event command
-mkAggregateHandler = AggregateHandler
+mkAggregateHandler h = AggregateHandler h (RejectionReason . T.pack . show)
+
+-- | Construct an 'AggregateHandler' with an explicit error formatter.
+mkAggregateHandlerWith ::
+  (err -> RejectionReason) ->
+  CommandHandler state event command err ->
+  AggregateHandler event command
+mkAggregateHandlerWith fmt h = AggregateHandler h fmt
 
 -- | Build a 'CommandDispatcher' from a list of 'AggregateHandler's.
 --
@@ -61,5 +68,5 @@ commandHandlerDispatcher writer reader handlers =
       case result of
         Right (_ : _) -> pure CommandSucceeded
         Left (CommandRejected err) -> pure (CommandFailed (formatErr err))
-        Left (ConcurrencyConflict _) -> pure (CommandFailed (T.pack "Concurrency conflict"))
+        Left (ConcurrencyConflict _) -> pure (CommandFailed "Concurrency conflict")
         Right [] -> go rest uuid cmd
