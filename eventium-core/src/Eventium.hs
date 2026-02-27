@@ -4,6 +4,7 @@ module Eventium
 where
 
 import Eventium.Codec as X
+import Eventium.CommandDispatcher as X
 import Eventium.CommandHandler as X
 import Eventium.EventHandler as X
 import Eventium.EventPublisher as X

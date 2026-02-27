@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Bank.CLI.Store
   ( runDB,
@@ -15,6 +15,7 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Data.Aeson
 import Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy.Char8 as BSL
+import Data.Text (Text, pack)
 import Database.Persist.Sqlite
 import Eventium
 import Eventium.Store.Sqlite
@@ -31,20 +32,20 @@ cliEventStoreWriter =
   where
     sqlStore = sqliteEventStoreWriter defaultSqlEventStoreConfig
     writer = codecEventStoreWriter jsonStringCodec sqlStore
-    eventHandler = EventHandler $ \event -> do
-      liftIO $ printJSONPretty (streamEventKey event, streamEventEvent event)
-      runTransferManager event
+    dispatcher =
+      commandHandlerDispatcher
+        cliEventStoreWriter
+        cliEventStoreReader
+        [mkAggregateHandlerWith formatAccountError accountBankCommandHandler]
+    eventHandler =
+      EventHandler (\event -> liftIO $ printJSONPretty (streamEventKey event, streamEventPayload event))
+        <> processManagerEventHandler transferProcessManager cliGlobalEventStoreReader dispatcher
 
-runTransferManager :: (MonadIO m) => VersionedStreamEvent BankEvent -> SqlPersistT m ()
-runTransferManager newEvent = do
-  let projection = processManagerProjection transferProcessManager
-      globalProjection = globalStreamProjection projection
-  StreamProjection {..} <- getLatestStreamProjection cliGlobalEventStoreReader globalProjection
-  let effects = processManagerReact transferProcessManager streamProjectionState newEvent
-      dispatch uuid cmd = do
-        _ <- applyCommandHandler cliEventStoreWriter cliEventStoreReader accountBankCommandHandler uuid cmd
-        return ()
-  runProcessManagerEffects dispatch effects
+formatAccountError :: AccountCommandError -> RejectionReason
+formatAccountError AccountAlreadyOpen = "Account already open"
+formatAccountError InvalidInitialDeposit = "Invalid initial deposit"
+formatAccountError (InsufficientFunds balance) = RejectionReason . pack $ "Insufficient funds (balance: " ++ show balance ++ ")"
+formatAccountError AccountNotOpen = "Account not open"
 
 cliGlobalEventStoreReader :: (MonadIO m) => GlobalEventStoreReader (SqlPersistT m) BankEvent
 cliGlobalEventStoreReader =

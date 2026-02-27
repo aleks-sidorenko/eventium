@@ -33,7 +33,7 @@ spec = describe "resilientPollingSubscription" $ do
 
     deliveredRef <- newIORef ([] :: [Int])
     let handler = EventHandler $ \ge ->
-          modifyIORef deliveredRef (++ [streamEventEvent $ streamEventEvent ge])
+          modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload ge])
 
     callbackRef <- newIORef (0 :: Int)
     let config =

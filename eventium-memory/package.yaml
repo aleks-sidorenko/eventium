@@ -1,5 +1,5 @@
 name: eventium-memory
-version: "0.1.0"
+version: "0.2.0"
 maintainer: Alexander Sidorenko
 synopsis: In-memory implementations for eventium
 description: |
@@ -20,7 +20,7 @@ extra-source-files:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-core >= 0.2.0 && < 0.3.0
   - containers >= 0.6 && < 0.8
   - mtl >= 2.2 && < 2.4
   - safe >= 0.3 && < 0.4

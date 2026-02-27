@@ -109,7 +109,7 @@ projectionPollOnce globalReader proj checkpoint pollIntervalMs = do
   delayMillis pollIntervalMs
   where
     applyGlobalEvent (_, state) globalEvent =
-      let innerEvent = streamEventEvent globalEvent
+      let innerEvent = streamEventPayload globalEvent
           newState = projectionEventHandler proj state innerEvent
           newSeq = streamEventPosition globalEvent
        in (newSeq, newState)

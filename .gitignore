@@ -12,3 +12,6 @@ doc/_build/
 database.db-*
 tags
 *.local
+
+# Claude
+.claude/

@@ -53,7 +53,7 @@ spec = do
 
       -- Verify events are also stored
       events <- getEvents reader (allEvents (uuidFromInteger 1))
-      map streamEventEvent events `shouldBe` [10, 20, 30]
+      map streamEventPayload events `shouldBe` [10, 20, 30]
 
     it "should NOT publish events when the write fails" $ do
       tvar <- eventMapTVar

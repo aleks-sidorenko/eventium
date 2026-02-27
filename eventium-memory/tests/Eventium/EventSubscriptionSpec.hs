@@ -39,7 +39,7 @@ spec = do
       -- Collect delivered events
       deliveredRef <- newIORef ([] :: [Int])
       let handler = EventHandler $ \globalEvent ->
-            modifyIORef deliveredRef (++ [streamEventEvent $ streamEventEvent globalEvent])
+            modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload globalEvent])
 
       -- Run subscription in background, give it time to poll once
       tid <- forkIO $ runSubscription sub handler
@@ -69,7 +69,7 @@ spec = do
 
       deliveredRef <- newIORef ([] :: [Int])
       let handler = EventHandler $ \globalEvent ->
-            modifyIORef deliveredRef (++ [streamEventEvent $ streamEventEvent globalEvent])
+            modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload globalEvent])
 
       -- Write more events
       _ <- storeEvents writer (uuidFromInteger 2) NoStream [30]

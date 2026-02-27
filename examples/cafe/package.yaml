@@ -1,5 +1,5 @@
 name: examples-cafe
-version: "0.1.0"
+version: "0.2.0"
 maintainer: Alexander Sidorenko
 synopsis: Example cafe application for eventium
 description: |
@@ -12,8 +12,8 @@ license: MIT
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.1.0 && < 0.2.0
-  - eventium-sqlite >= 0.1.0 && < 0.2.0
+  - eventium-core >= 0.2.0 && < 0.3.0
+  - eventium-sqlite >= 0.2.0 && < 0.3.0
 
   - aeson >= 1.5 && < 2.3
   - aeson-casing >= 0.2 && < 0.3

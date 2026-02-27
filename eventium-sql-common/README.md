@@ -14,20 +14,29 @@ A single `events` table:
 
 ```sql
 CREATE TABLE events (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,  -- global sequence number
-    uuid            UUID    NOT NULL,
-    version         INTEGER NOT NULL,
-    event_type      TEXT    NOT NULL,
-    event           JSONB   NOT NULL,
-    correlation_id  UUID,
-    causation_id    UUID,
-    created_at      TIMESTAMPTZ,
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,  -- global sequence number
+    uuid      UUID    NOT NULL,
+    version   INTEGER NOT NULL,
+    event     JSONB   NOT NULL,
+    metadata  JSONB,
     UNIQUE (uuid, version)
 );
 ```
 
 The auto-increment primary key serves as the global sequence number. Per-aggregate
 ordering uses the `(uuid, version)` pair. No separate global events table exists.
+
+`metadata` stores an `EventMetadata` value as JSON (NULL when written via the
+non-tagged writer path):
+
+```json
+{
+  "eventType": "AccountOpened",
+  "correlationId": "550e8400-...",
+  "causationId": null,
+  "createdAt": "2026-02-27T12:00:00Z"
+}
+```
 
 ## Key Exports
 

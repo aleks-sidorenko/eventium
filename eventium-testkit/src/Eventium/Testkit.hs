@@ -142,7 +142,7 @@ eventStoreSpec (EventStoreRunner withStore) = do
 
     it "should return events" $ do
       events' <- withStore' $ \_ reader -> getEvents reader (allEvents nil)
-      (streamEventEvent <$> events') `shouldBe` sampleEvents
+      (streamEventPayload <$> events') `shouldBe` sampleEvents
 
     it "should return correct event versions" $ do
       events <- withStore' $ \_ reader -> getEvents reader (allEvents nil)
@@ -155,10 +155,10 @@ eventStoreSpec (EventStoreRunner withStore) = do
           <*> getEvents reader (eventsStartingAtUntil nil 1 2)
           <*> getEvents reader (eventsStartingAt nil 2)
           <*> getEvents reader (eventsStartingAtTakeLimit nil 0 2)
-      (streamEventEvent <$> firstEvents) `shouldBe` take 2 sampleEvents
-      (streamEventEvent <$> middleEvents) `shouldBe` take 2 (drop 1 sampleEvents)
-      (streamEventEvent <$> laterEvents) `shouldBe` drop 2 sampleEvents
-      (streamEventEvent <$> maxEvents) `shouldBe` take 2 sampleEvents
+      (streamEventPayload <$> firstEvents) `shouldBe` take 2 sampleEvents
+      (streamEventPayload <$> middleEvents) `shouldBe` take 2 (drop 1 sampleEvents)
+      (streamEventPayload <$> laterEvents) `shouldBe` drop 2 sampleEvents
+      (streamEventPayload <$> maxEvents) `shouldBe` take 2 sampleEvents
 
     it "should return the latest projection" $ do
       projection <- withStore' $ \_ reader ->
@@ -170,7 +170,7 @@ eventStoreSpec (EventStoreRunner withStore) = do
     it "should return the latest projection with some starting StreamProjection" $ do
       projection <- withStore' $ \_ reader -> do
         initialEvents <- getEvents reader (eventsUntil nil 1)
-        let initialProjection = latestProjection counterProjection (streamEventEvent <$> initialEvents)
+        let initialProjection = latestProjection counterProjection (streamEventPayload <$> initialEvents)
         getLatestStreamProjection reader (StreamProjection nil 1 counterProjection initialProjection)
       streamProjectionState projection `shouldBe` Counter 7
       streamProjectionPosition projection `shouldBe` 3
@@ -180,8 +180,8 @@ eventStoreSpec (EventStoreRunner withStore) = do
     it "should have the correct events for each stream" $ do
       (events1, events2) <- withStoreExampleEvents $ \_ reader ->
         (,) <$> getEvents reader (allEvents uuid1) <*> getEvents reader (allEvents uuid2)
-      (streamEventEvent <$> events1) `shouldBe` Added <$> [1, 4]
-      (streamEventEvent <$> events2) `shouldBe` Added <$> [2, 3, 5]
+      (streamEventPayload <$> events1) `shouldBe` Added <$> [1, 4]
+      (streamEventPayload <$> events2) `shouldBe` Added <$> [2, 3, 5]
       (streamEventKey <$> events1) `shouldBe` [uuid1, uuid1]
       (streamEventKey <$> events2) `shouldBe` [uuid2, uuid2, uuid2]
       (streamEventPosition <$> events1) `shouldBe` [0, 1]
@@ -192,8 +192,8 @@ eventStoreSpec (EventStoreRunner withStore) = do
         (,)
           <$> getEvents reader (allEvents uuid1)
           <*> getEvents reader (allEvents uuid2)
-      streamEventEvent <$> events1 `shouldBe` [Added 1, Added 4]
-      streamEventEvent <$> events2 `shouldBe` [Added 2, Added 3, Added 5]
+      streamEventPayload <$> events1 `shouldBe` [Added 1, Added 4]
+      streamEventPayload <$> events2 `shouldBe` [Added 2, Added 3, Added 5]
 
     it "should return correct events with queries" $ do
       (firstEvents, middleEvents, laterEvents, maxEvents) <- withStoreExampleEvents $ \_ reader ->
@@ -202,10 +202,10 @@ eventStoreSpec (EventStoreRunner withStore) = do
           <*> getEvents reader (eventsStartingAtUntil uuid2 1 2)
           <*> getEvents reader (eventsStartingAt uuid2 2)
           <*> getEvents reader (eventsStartingAtTakeLimit uuid1 1 1)
-      (streamEventEvent <$> firstEvents) `shouldBe` [Added 1, Added 4]
-      (streamEventEvent <$> middleEvents) `shouldBe` [Added 3, Added 5]
-      (streamEventEvent <$> laterEvents) `shouldBe` [Added 5]
-      (streamEventEvent <$> maxEvents) `shouldBe` [Added 4]
+      (streamEventPayload <$> firstEvents) `shouldBe` [Added 1, Added 4]
+      (streamEventPayload <$> middleEvents) `shouldBe` [Added 3, Added 5]
+      (streamEventPayload <$> laterEvents) `shouldBe` [Added 5]
+      (streamEventPayload <$> maxEvents) `shouldBe` [Added 4]
 
     it "should produce the correct projections" $ do
       (proj1, proj2) <- withStoreExampleEvents $ \_ reader ->
@@ -266,9 +266,9 @@ globalStreamEventStoreSpec (GlobalStreamEventStoreRunner withStore) = do
       events <- withStore $ \writer globalReader -> do
         insertExampleEvents writer
         getEvents globalReader (allEvents ())
-      (streamEventEvent . streamEventEvent <$> events) `shouldBe` Added <$> [1 .. 5]
-      (streamEventKey . streamEventEvent <$> events) `shouldBe` [uuid1, uuid2, uuid2, uuid1, uuid2]
-      (streamEventPosition . streamEventEvent <$> events) `shouldBe` [0, 0, 1, 1, 2]
+      (streamEventPayload . streamEventPayload <$> events) `shouldBe` Added <$> [1 .. 5]
+      (streamEventKey . streamEventPayload <$> events) `shouldBe` [uuid1, uuid2, uuid2, uuid1, uuid2]
+      (streamEventPosition . streamEventPayload <$> events) `shouldBe` [0, 0, 1, 1, 2]
       (streamEventPosition <$> events) `shouldBe` [1 .. 5]
 
     it "should work with global projections" $ do
@@ -291,13 +291,13 @@ globalStreamEventStoreSpec (GlobalStreamEventStoreRunner withStore) = do
           <*> getEvents globalReader (eventsStartingAt () 3)
           <*> getEvents globalReader (eventsStartingAtTakeLimit () 2 3)
 
-      (streamEventEvent . streamEventEvent <$> firstEvents) `shouldBe` Added <$> [1 .. 2]
+      (streamEventPayload . streamEventPayload <$> firstEvents) `shouldBe` Added <$> [1 .. 2]
       (streamEventPosition <$> firstEvents) `shouldBe` [1 .. 2]
-      (streamEventEvent . streamEventEvent <$> middleEvents) `shouldBe` Added <$> [2 .. 3]
+      (streamEventPayload . streamEventPayload <$> middleEvents) `shouldBe` Added <$> [2 .. 3]
       (streamEventPosition <$> middleEvents) `shouldBe` [2 .. 3]
-      (streamEventEvent . streamEventEvent <$> laterEvents) `shouldBe` Added <$> [3 .. 5]
+      (streamEventPayload . streamEventPayload <$> laterEvents) `shouldBe` Added <$> [3 .. 5]
       (streamEventPosition <$> laterEvents) `shouldBe` [3 .. 5]
-      (streamEventEvent . streamEventEvent <$> maxEvents) `shouldBe` Added <$> [2 .. 4]
+      (streamEventPayload . streamEventPayload <$> maxEvents) `shouldBe` Added <$> [2 .. 4]
       (streamEventPosition <$> maxEvents) `shouldBe` [2 .. 4]
 
 insertExampleEvents ::

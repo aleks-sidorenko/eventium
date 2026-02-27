@@ -1,5 +1,5 @@
 name: eventium-postgresql
-version: "0.1.0"
+version: "0.2.0"
 maintainer: Alexander Sidorenko
 synopsis: Postgres implementations for eventium
 description: |
@@ -20,8 +20,8 @@ extra-source-files:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.1.0 && < 0.2.0
-  - eventium-sql-common >= 0.1.0 && < 0.2.0
+  - eventium-core >= 0.2.0 && < 0.3.0
+  - eventium-sql-common >= 0.2.0 && < 0.3.0
 
   - aeson >= 1.5 && < 2.3
   - bytestring >= 0.10 && < 0.13

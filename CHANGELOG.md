@@ -48,6 +48,22 @@ Major refactoring of the core API.
   graceful handling of unknown event types.
 - `runProjectionSubscription` for maintaining projection state via polling.
 - `eventHandlerMapMaybe` for filtering events before handling.
+- **CommandDispatcher** newtype: wraps `UUID -> command -> m CommandDispatchResult`,
+  replacing bare dispatch functions. `mkCommandDispatcher` and
+  `fireAndForgetDispatcher` (for legacy callbacks) construct dispatchers.
+- `CommandDispatchResult` (`CommandSucceeded` | `CommandFailed Text`): typed
+  outcome from command dispatch, enabling compensation workflows.
+- `IssueCommandWithCompensation` effect: extends `ProcessManagerEffect` with
+  a compensation handler `(Text -> [ProcessManagerEffect command])` that fires
+  on `CommandFailed`.
+- `processManagerEventHandler`: wires a `ProcessManager` to a global reader
+  and a `CommandDispatcher`, producing an `EventHandler` ready for use with
+  `EventPublisher`.
+- **CommandDispatcher module** (`Eventium.CommandDispatcher`): list-based command
+  routing for multi-aggregate systems via `AggregateHandler` (existential wrapper)
+  and `commandHandlerDispatcher`.
+- `embeddedCommandHandler` now returns `Right []` for non-matching commands
+  instead of throwing `DecodeError`, enabling safe multi-aggregate dispatching.
 
 ## 0.1.0
 

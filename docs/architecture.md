@@ -1,4 +1,4 @@
-# Eventium Design
+# Eventium Architecture & Design
 
 ## Core Concepts
 
@@ -28,7 +28,7 @@ data StreamEvent key position event = StreamEvent
   { streamEventKey      :: key
   , streamEventPosition :: position
   , streamEventMetadata :: EventMetadata
-  , streamEventEvent    :: event
+  , streamEventPayload  :: event
   }
 ```
 
@@ -51,16 +51,13 @@ sequence number while preserving the original stream key and version.
 
 A single `events` table stores both per-aggregate and global ordering:
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` (PK) | auto-increment | Global sequence number |
-| `uuid` | UUID | Aggregate / stream identifier |
-| `version` | Int | Position within the stream |
-| `event_type` | Text | Discriminator for deserialization |
-| `event` | JSON/JSONB | Serialized event payload |
-| `correlation_id` | UUID (nullable) | Request correlation |
-| `causation_id` | UUID (nullable) | Causal chain tracking |
-| `created_at` | UTCTime (nullable) | Event timestamp |
+| Column           | Type               | Purpose                           |
+| ---------------- | ------------------ | --------------------------------- |
+| `id` (PK)        | auto-increment     | Global sequence number            |
+| `uuid`           | UUID               | Aggregate / stream identifier     |
+| `version`        | Int                | Position within the stream        |
+| `payload`        | JSON/JSONB         | Serialized event payload          |
+| `metadata`       | JSONB (nullable)   | EventMetadata (event type, correlation/causation IDs, timestamp) |
 
 A unique constraint on `(uuid, version)` enforces per-stream ordering.
 The auto-increment primary key provides global ordering without a separate table.
@@ -87,6 +84,7 @@ Polymorphic over key type, position type, monad, and event type.
 monads (e.g. `STM` to `IO`, `SqlPersistT m` to `m`).
 
 **Optimistic concurrency** is enforced via `ExpectedPosition`:
+
 - `AnyPosition` -- no check
 - `NoStream` -- stream must not exist
 - `StreamExists` -- stream must already exist
@@ -127,13 +125,46 @@ data ProcessManager state event command = ProcessManager
                              -> [ProcessManagerEffect command]
   }
 
-newtype ProcessManagerEffect command
+data ProcessManagerEffect command
   = IssueCommand UUID command
+  | IssueCommandWithCompensation UUID command (Text -> [ProcessManagerEffect command])
 ```
 
 Coordinates workflows across aggregates. The `react` function is pure -- it
 returns data describing what commands to issue, not monadic actions.
-`runProcessManagerEffects` executes the effects by dispatching commands.
+
+`IssueCommandWithCompensation` extends simple command dispatch with a
+compensation handler: if the dispatched command fails, the compensation
+function receives the failure reason and produces follow-up effects (e.g.
+rejecting a transfer when the target account refuses a credit).
+
+### CommandDispatcher
+
+```haskell
+newtype CommandDispatcher m command = CommandDispatcher
+  { dispatchCommand :: UUID -> command -> m CommandDispatchResult }
+
+data CommandDispatchResult
+  = CommandSucceeded
+  | CommandFailed Text
+```
+
+Replaces bare `UUID -> command -> m ()` dispatch functions.
+`CommandDispatchResult` makes failure observable so that process managers can
+react with compensation effects.
+
+- `mkCommandDispatcher` -- construct from a dispatch function.
+- `fireAndForgetDispatcher` -- adapt a legacy callback that ignores outcomes.
+- `commandHandlerDispatcher` -- route commands through a list of
+  `AggregateHandler`s (existential wrappers that erase aggregate state and
+  error types).
+
+`processManagerEventHandler` wires a `ProcessManager` to a
+`GlobalEventStoreReader` and a `CommandDispatcher`, producing an `EventHandler`
+suitable for use with `EventPublisher`.
+
+`runProcessManagerEffects` executes `[ProcessManagerEffect]` via a
+`CommandDispatcher`, triggering compensation handlers on `CommandFailed`.
 
 ### EventHandler
 
@@ -218,27 +249,34 @@ examples/bank          Banking: accounts, customers, transfers (process manager,
 ## Design Decisions
 
 ### Single events table
+
 Both per-aggregate reads (filter by `uuid`, order by `version`) and global reads
 (order by `id`) use the same table. This avoids dual-write consistency issues
 and keeps the schema simple.
 
 ### Pure process managers
+
 `processManagerReact` returns `[ProcessManagerEffect]` -- plain data values --
 rather than performing I/O directly. This makes process manager logic
-unit-testable without mocking stores.
+unit-testable without mocking stores. Compensation logic is also pure:
+`IssueCommandWithCompensation` carries a function producing further effects on
+failure, keeping the entire saga decision tree in testable data.
 
 ### Explicit command handler errors
+
 `CommandHandler` carries an `err` type parameter so domain validation errors
 are distinguished from infrastructure errors (concurrency conflicts) at the
 type level.
 
 ### Codec as record, not typeclass
+
 `Codec` is a value-level record rather than a typeclass. This allows
 multiple codecs for the same type and avoids orphan-instance problems.
 Codecs compose with `composeCodecs` and work with TH-generated
 sum-type boilerplate.
 
 ### Metadata on StreamEvent
+
 `EventMetadata` (event type, correlation/causation IDs, timestamp) lives on
 every `StreamEvent`. This supports event-type-based routing, distributed
 tracing, and audit requirements without requiring the domain event type to

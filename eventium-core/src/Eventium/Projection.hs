@@ -108,7 +108,7 @@ streamProjectionEventHandler ::
 streamProjectionEventHandler StreamProjection {..} streamEvent =
   let Projection {..} = streamProjectionProjection
       position' = streamEventPosition streamEvent
-      state' = projectionEventHandler streamProjectionState (streamEventEvent streamEvent)
+      state' = projectionEventHandler streamProjectionState (streamEventPayload streamEvent)
    in StreamProjection streamProjectionKey position' streamProjectionProjection state'
 
 -- | Gets the latest projection from a store by querying events from the latest

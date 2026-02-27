@@ -25,7 +25,7 @@ runCLICommand pool (ViewAccountCLI uuid) = do
   printJSONPretty (streamProjectionState latestStreamProjection)
 runCLICommand pool (ViewCustomerAccountsCLI name) = do
   events <- runDB pool $ getEvents cliGlobalEventStoreReader (allEvents ())
-  let allCustomerAccounts = latestProjection customerAccountsProjection (streamEventEvent <$> events)
+  let allCustomerAccounts = latestProjection customerAccountsProjection (streamEventPayload <$> events)
       thisCustomerAccounts = getCustomerAccountsFromName allCustomerAccounts name
   case thisCustomerAccounts of
     [] -> putStrLn "No accounts found"

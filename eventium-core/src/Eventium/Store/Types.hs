@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -29,7 +30,9 @@ where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import Eventium.Json (unPrefixLower)
 import Eventium.UUID
+import GHC.Generics (Generic)
 import Web.HttpApiData
 import Web.PathPieces
 
@@ -40,7 +43,14 @@ data EventMetadata = EventMetadata
     eventMetadataCausationId :: !(Maybe UUID),
     eventMetadataCreatedAt :: !(Maybe UTCTime)
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance ToJSON EventMetadata where
+  toJSON = genericToJSON (unPrefixLower "eventMetadata")
+  toEncoding = genericToEncoding (unPrefixLower "eventMetadata")
+
+instance FromJSON EventMetadata where
+  parseJSON = genericParseJSON (unPrefixLower "eventMetadata")
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata
@@ -63,7 +73,7 @@ data StreamEvent key position event
   { streamEventKey :: !key,
     streamEventPosition :: !position,
     streamEventMetadata :: !EventMetadata,
-    streamEventEvent :: !event
+    streamEventPayload :: !event
   }
   deriving (Show, Eq, Functor, Foldable, Traversable)
 

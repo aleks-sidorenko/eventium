@@ -1,5 +1,5 @@
 name: eventium-sql-common
-version: "0.1.0"
+version: "0.2.0"
 maintainer: Alexander Sidorenko
 synopsis: Common library for SQL event stores
 description: |
@@ -17,7 +17,7 @@ github: aleks-sidorenko/eventium
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.1.0 && < 0.2.0
+  - eventium-core >= 0.2.0 && < 0.3.0
 
   - aeson >= 1.5 && < 2.3
   - bytestring >= 0.10 && < 0.13

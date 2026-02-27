@@ -8,14 +8,14 @@ Eventium provides composable, type-safe abstractions for event sourcing: event s
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| **eventium-core** | Core abstractions: event stores, projections, command handlers, process managers, codecs, TH utilities |
-| **eventium-memory** | STM-based in-memory event store for development and testing |
-| **eventium-sqlite** | SQLite backend via `persistent` |
-| **eventium-postgresql** | PostgreSQL backend via `persistent` |
-| **eventium-sql-common** | Shared Persistent entity definitions and SQL operations |
-| **eventium-testkit** | Shared hspec test utilities |
+| Package                 | Description                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| **eventium-core**       | Core abstractions: event stores, projections, command handlers, process managers, codecs, TH utilities |
+| **eventium-memory**     | STM-based in-memory event store for development and testing                                            |
+| **eventium-sqlite**     | SQLite backend via `persistent`                                                                        |
+| **eventium-postgresql** | PostgreSQL backend via `persistent`                                                                    |
+| **eventium-sql-common** | Shared Persistent entity definitions and SQL operations                                                |
+| **eventium-testkit**    | Shared hspec test utilities                                                                            |
 
 ## Quick Start
 
@@ -37,7 +37,7 @@ Add `eventium-core` plus a storage backend to your dependencies:
 ```yaml
 dependencies:
   - eventium-core >= 0.1.0
-  - eventium-sqlite >= 0.1.0   # or eventium-postgresql, eventium-memory
+  - eventium-sqlite >= 0.1.0 # or eventium-postgresql, eventium-memory
 ```
 
 ### Minimal example
@@ -64,7 +64,8 @@ main = do
 - **Projection** -- Pure fold: seed state + event handler. Rebuilds aggregate or read-model state from events.
 - **CommandHandler** -- Validates a command against current state and produces events or a domain error.
 - **EventStoreReader / EventStoreWriter** -- Polymorphic over key, position, monad, and event types. Supports versioned (per-aggregate) and global (cross-aggregate) streams.
-- **ProcessManager** -- Coordinates long-running workflows across aggregates. Reacts to events with pure `[ProcessManagerEffect]` values.
+- **ProcessManager** -- Coordinates long-running workflows across aggregates. Reacts to events with pure `[ProcessManagerEffect]` values (including `IssueCommandWithCompensation` for saga compensation).
+- **CommandDispatcher** -- Routes commands to aggregates and reports `CommandDispatchResult` (`CommandSucceeded` | `CommandFailed`). `commandHandlerDispatcher` provides list-based multi-aggregate routing.
 - **EventHandler** -- Composable event consumer with `Contravariant`, `Semigroup`, and `Monoid` instances.
 - **EventPublisher** -- Decouples post-write notification from the store writer. `publishingEventStoreWriter` wraps a writer to auto-dispatch after each write.
 - **EventSubscription** -- Push-based event delivery. `pollingSubscription` polls the global stream at a configurable interval.
@@ -75,20 +76,26 @@ main = do
 Three working examples demonstrate increasing complexity:
 
 ### Counter CLI (`examples/counter-cli/`)
+
 Minimal single-file example: bounded counter with in-memory store.
+
 ```bash
 cabal run counter-cli
 ```
 
 ### Cafe (`examples/cafe/`)
+
 Restaurant ordering system (inspired by [Edument's CQRS tutorial](http://cqrs.nu/tutorial)): tab management, chef todo list as a polling read model.
+
 ```bash
 cabal run cafe-main -- --help
 cabal run cafe-chef-todo-main -- --database-path cafe.db
 ```
 
 ### Bank (`examples/bank/`)
+
 Full CQRS application: accounts, customers, money transfers via process manager, read models, event publishing.
+
 ```bash
 cabal run bank-main -- --help
 ```
@@ -109,7 +116,7 @@ PostgreSQL tests require a running instance (`docker compose up -d`). See [CLAUD
 
 ## Documentation
 
-- [Design](DESIGN.md) -- Architecture and design decisions
+- [Architecture](./docs/architecute.md) -- Architecture and design decisions
 - [Changelog](CHANGELOG.md) -- Version history
 - [Examples](examples/) -- Working applications
 

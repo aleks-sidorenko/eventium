@@ -61,7 +61,7 @@ spec = do
 
       -- Verify events are stored
       events <- getEvents reader (allEvents uuid)
-      map streamEventEvent events `shouldBe` [10]
+      map streamEventPayload events `shouldBe` [10]
 
     it "should return CommandRejected on domain error" $ do
       tvar <- eventMapTVar
@@ -103,7 +103,7 @@ spec = do
 
       -- Verify only two events stored
       events <- getEvents reader (allEvents uuid)
-      map streamEventEvent events `shouldBe` [30, 40]
+      map streamEventPayload events `shouldBe` [30, 40]
 
   describe "codecCommandHandler" $ do
     it "should map through codecs on success" $ do
