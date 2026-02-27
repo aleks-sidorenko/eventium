@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -30,6 +31,7 @@ import Data.Aeson
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Eventium.UUID
+import GHC.Generics (Generic)
 import Web.HttpApiData
 import Web.PathPieces
 
@@ -40,7 +42,11 @@ data EventMetadata = EventMetadata
     eventMetadataCausationId :: !(Maybe UUID),
     eventMetadataCreatedAt :: !(Maybe UTCTime)
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance ToJSON EventMetadata
+
+instance FromJSON EventMetadata
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata
