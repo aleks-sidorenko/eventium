@@ -69,6 +69,8 @@ sqlEventToGlobalStream config@SqlEventStoreConfig {..} (Entity key event) =
   let versioned = sqlEventToVersioned config event
    in StreamEvent () (sqlEventStoreConfigUnKey key) (streamEventMetadata versioned) versioned
 
+-- | Decode metadata from a stored JSONString. Returns empty metadata on NULL
+-- or decode failure, ensuring events are always readable.
 decodeMetadata :: Maybe JSONString -> EventMetadata
 decodeMetadata = fromMaybe (emptyMetadata "") . (>>= decodeJSON)
 

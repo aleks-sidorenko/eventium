@@ -60,7 +60,7 @@ initializeSqliteEventStore SqlEventStoreConfig {..} pool = do
   _ <- liftIO $ runSqlPool (runMigrationSilent migrateSqlEvent) pool
 
   -- Create index on uuid field so retrieval is very fast
-  let tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity undefined undefined undefined undefined undefined undefined undefined)
+  let tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity undefined undefined undefined undefined)
       uuidFieldName = unFieldNameDB $ fieldDBName sqlEventStoreConfigSequenceNumberField
       indexSql =
         "CREATE INDEX IF NOT EXISTS "
