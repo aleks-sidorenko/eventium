@@ -30,6 +30,7 @@ where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import Eventium.Json (unPrefixLower)
 import Eventium.UUID
 import GHC.Generics (Generic)
 import Web.HttpApiData
@@ -44,9 +45,12 @@ data EventMetadata = EventMetadata
   }
   deriving (Show, Eq, Generic)
 
-instance ToJSON EventMetadata
+instance ToJSON EventMetadata where
+  toJSON = genericToJSON (unPrefixLower "eventMetadata")
+  toEncoding = genericToEncoding (unPrefixLower "eventMetadata")
 
-instance FromJSON EventMetadata
+instance FromJSON EventMetadata where
+  parseJSON = genericParseJSON (unPrefixLower "eventMetadata")
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata

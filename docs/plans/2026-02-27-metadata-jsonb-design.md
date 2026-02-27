@@ -21,13 +21,13 @@ events(id, uuid, version, event, metadata)
 --                                ^^^^^^^^ jsonb NULL
 ```
 
-`metadata` is `NULL` when written via the non-tagged writer path. When present (field names match Haskell record fields, consistent with event payload serialization):
+`metadata` is `NULL` when written via the non-tagged writer path. When present (prefix stripped via `unPrefixLower`, consistent with event payload serialization):
 ```json
 {
-  "eventMetadataEventType": "BankAccountOpened",
-  "eventMetadataCorrelationId": "550e8400-...",
-  "eventMetadataCausationId": null,
-  "eventMetadataCreatedAt": "2026-02-27T12:00:00Z"
+  "eventType": "BankAccountOpened",
+  "correlationId": "550e8400-...",
+  "causationId": null,
+  "createdAt": "2026-02-27T12:00:00Z"
 }
 ```
 
