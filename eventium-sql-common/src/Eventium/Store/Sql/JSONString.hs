@@ -4,6 +4,8 @@
 module Eventium.Store.Sql.JSONString
   ( JSONString,
     jsonStringCodec,
+    encodeJSON,
+    decodeJSON,
   )
 where
 
