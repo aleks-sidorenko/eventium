@@ -19,7 +19,6 @@ dependencies:
   - eventium-core >= 0.2.0 && < 0.3.0
 
   - aeson >= 1.5 && < 2.3
-  - aeson-casing >= 0.2 && < 0.3
   - extra >= 1.7 && < 1.8
   - hspec >= 2.8 && < 2.12
   - monad-logger >= 0.3 && < 0.4

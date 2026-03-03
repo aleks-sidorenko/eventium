@@ -31,7 +31,6 @@ import Control.Monad as X
 import Control.Monad.IO.Class as X
 import Control.Monad.Logger as X
 import Data.Aeson
-import Data.Aeson.Casing
 import Data.Aeson.TH
 import Data.Foldable (foldl')
 import Data.List (scanl')
@@ -92,8 +91,8 @@ counterCommand (Counter k) (Decrement n) =
     then Right [Added (-n)]
     else Left CounterOutOfBounds
 
-deriveJSON (aesonPrefix camelCase) ''CounterEvent
-deriveJSON (aesonPrefix camelCase) ''CounterCommand
+deriveJSON defaultOptions ''CounterEvent
+deriveJSON defaultOptions ''CounterCommand
 
 -- | Given a list of commands, produce all of the states the command handler's
 -- projection sees. This is useful for unit testing a 'CommandHandler' by
