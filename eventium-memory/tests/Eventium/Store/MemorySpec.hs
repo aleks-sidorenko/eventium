@@ -64,12 +64,12 @@ stateStoreGlobalRunner = GlobalStreamEventStoreRunner $
 embeddedStateStoreRunner :: EventStoreRunner (StateT (StreamEmbeddedState Counter CounterEvent) IO)
 embeddedStateStoreRunner = EventStoreRunner $ \action -> evalStateT (action writer reader) emptyEmbeddedState
   where
-    writer = embeddedStateEventStoreWriter embeddedEventMap setEventMap
-    reader = embeddedStateEventStoreReader embeddedEventMap
+    writer = embeddedStateEventStoreWriter (.eventMap) setEventMap
+    reader = embeddedStateEventStoreReader (.eventMap)
 
 embeddedStateStoreGlobalRunner :: GlobalStreamEventStoreRunner (StateT (StreamEmbeddedState Counter CounterEvent) IO)
 embeddedStateStoreGlobalRunner = GlobalStreamEventStoreRunner $
   \action -> evalStateT (action writer globalReader) emptyEmbeddedState
   where
-    writer = embeddedStateEventStoreWriter embeddedEventMap setEventMap
-    globalReader = embeddedStateGlobalEventStoreReader embeddedEventMap
+    writer = embeddedStateEventStoreWriter (.eventMap) setEventMap
+    globalReader = embeddedStateGlobalEventStoreReader (.eventMap)

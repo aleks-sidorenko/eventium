@@ -14,9 +14,9 @@ import Eventium.UUID
 
 data EmbeddedState state event key position
   = EmbeddedState
-  { _embeddedDummyArgument :: Int,
-    embeddedEventMap :: EventMap event,
-    embeddedProjectionMap :: ProjectionMap key position state
+  { dummyArgument :: Int,
+    eventMap :: EventMap event,
+    projectionMap :: ProjectionMap key position state
   }
 
 type StreamEmbeddedState state event = EmbeddedState state event UUID EventVersion
@@ -27,10 +27,10 @@ emptyEmbeddedState :: EmbeddedState state event key position
 emptyEmbeddedState = EmbeddedState 100 emptyEventMap emptyProjectionMap
 
 setEventMap :: EmbeddedState state event key position -> EventMap event -> EmbeddedState state event key position
-setEventMap state' eventMap = state' {embeddedEventMap = eventMap}
+setEventMap state' em = state' {eventMap = em}
 
 setProjectionMap ::
   EmbeddedState state event key position ->
   ProjectionMap key position state ->
   EmbeddedState state event key position
-setProjectionMap state' projectionMap = state' {embeddedProjectionMap = projectionMap}
+setProjectionMap state' pm = state' {projectionMap = pm}

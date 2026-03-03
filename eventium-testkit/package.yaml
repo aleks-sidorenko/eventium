@@ -29,3 +29,7 @@ library:
   source-dirs:
     - src
   ghc-options: -Wall
+  default-extensions:
+    - NoFieldSelectors
+    - DuplicateRecordFields
+    - OverloadedRecordDot

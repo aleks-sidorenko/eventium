@@ -30,11 +30,19 @@ library:
   source-dirs:
     - src
   ghc-options: -Wall
+  default-extensions:
+    - NoFieldSelectors
+    - DuplicateRecordFields
+    - OverloadedRecordDot
 
 tests:
   spec:
     main: Spec.hs
     ghc-options: -Wall
+    default-extensions:
+      - NoFieldSelectors
+      - DuplicateRecordFields
+      - OverloadedRecordDot
     source-dirs:
       - tests
       - src

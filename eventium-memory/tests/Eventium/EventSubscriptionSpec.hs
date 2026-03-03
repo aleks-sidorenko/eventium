@@ -25,24 +25,23 @@ spec = do
       let (writer, globalReader) = makeIOStores tvar
 
       -- Write some events
-      _ <- storeEvents writer (uuidFromInteger 1) NoStream [10 :: Int, 20]
-      _ <- storeEvents writer (uuidFromInteger 2) NoStream [30]
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [10 :: Int, 20]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [30]
 
       -- Set up checkpoint tracking
       checkpointRef <- newIORef (0 :: SequenceNumber)
-      let getCheckpoint = readIORef checkpointRef
-          saveCheckpoint = writeIORef checkpointRef
+      let cpStore = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
 
       -- Set up the subscription with very short poll interval
-      let sub = pollingSubscription globalReader (CheckpointStore getCheckpoint saveCheckpoint) 50
+      let sub = pollingSubscription globalReader cpStore 50
 
       -- Collect delivered events
       deliveredRef <- newIORef ([] :: [Int])
       let handler = EventHandler $ \globalEvent ->
-            modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload globalEvent])
+            modifyIORef deliveredRef (++ [globalEvent.payload.payload])
 
       -- Run subscription in background, give it time to poll once
-      tid <- forkIO $ runSubscription sub handler
+      tid <- forkIO $ sub.runSubscription handler
       threadDelay 200000 -- 200ms
       killThread tid
 
@@ -58,23 +57,22 @@ spec = do
       let (writer, globalReader) = makeIOStores tvar
 
       -- Write some initial events
-      _ <- storeEvents writer (uuidFromInteger 1) NoStream [10 :: Int, 20]
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [10 :: Int, 20]
 
       -- Start with checkpoint at 2 (already consumed)
       checkpointRef <- newIORef (2 :: SequenceNumber)
-      let getCheckpoint = readIORef checkpointRef
-          saveCheckpoint = writeIORef checkpointRef
+      let cpStore = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
 
-      let sub = pollingSubscription globalReader (CheckpointStore getCheckpoint saveCheckpoint) 50
+      let sub = pollingSubscription globalReader cpStore 50
 
       deliveredRef <- newIORef ([] :: [Int])
       let handler = EventHandler $ \globalEvent ->
-            modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload globalEvent])
+            modifyIORef deliveredRef (++ [globalEvent.payload.payload])
 
       -- Write more events
-      _ <- storeEvents writer (uuidFromInteger 2) NoStream [30]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [30]
 
-      tid <- forkIO $ runSubscription sub handler
+      tid <- forkIO $ sub.runSubscription handler
       threadDelay 200000
       killThread tid
 

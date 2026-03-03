@@ -35,8 +35,8 @@ import Eventium.UUID
 -- | Internal data structure used for the in-memory event stores.
 data EventMap event
   = EventMap
-  { _eventMapUuidMap :: Map UUID (Seq (VersionedStreamEvent event)),
-    _eventMapGlobalEvents :: Seq (VersionedStreamEvent event)
+  { uuidMap :: Map UUID (Seq (VersionedStreamEvent event)),
+    globalEvents :: Seq (VersionedStreamEvent event)
   }
   deriving (Show)
 
@@ -158,8 +158,8 @@ lookupEventMapRaw (EventMap uuidMap _) uuid = fromMaybe Seq.empty $ Map.lookup u
 lookupEventsInRange :: QueryRange UUID EventVersion -> EventMap event -> [VersionedStreamEvent event]
 lookupEventsInRange (QueryRange uuid start limit) store = toList $ filterEventsByRange start' limit' 0 rawEvents
   where
-    start' = unEventVersion <$> start
-    limit' = unEventVersion <$> limit
+    start' = (\(EventVersion n) -> n) <$> start
+    limit' = (\(EventVersion n) -> n) <$> limit
     rawEvents = lookupEventMapRaw store uuid
 
 filterEventsByRange :: QueryStart Int -> QueryLimit Int -> Int -> Seq event -> Seq event
@@ -181,10 +181,10 @@ latestEventVersion store uuid = EventVersion $ Seq.length (lookupEventMapRaw sto
 lookupGlobalEvents :: QueryRange () SequenceNumber -> EventMap event -> [GlobalStreamEvent event]
 lookupGlobalEvents (QueryRange () start limit) (EventMap _ globalEvents) = events'
   where
-    start' = unSequenceNumber <$> start
-    limit' = unSequenceNumber <$> limit
+    start' = (\(SequenceNumber n) -> n) <$> start
+    limit' = (\(SequenceNumber n) -> n) <$> limit
     events = toList $ filterEventsByRange start' limit' 1 globalEvents
-    events' = zipWith (\s e -> StreamEvent () s (streamEventMetadata e) e) [startingSeqNum ..] events
+    events' = zipWith (\s e -> StreamEvent () s e.metadata e) [startingSeqNum ..] events
     startingSeqNum =
       case start of
         StartFromBeginning -> 1

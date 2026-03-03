@@ -17,26 +17,26 @@ newtype TestCommand = AcceptCredit Int
   deriving (Show, Eq)
 
 newtype PMState = PMState
-  { pmPendingTransfers :: [(UUID, Int)]
+  { pendingTransfers :: [(UUID, Int)]
   }
   deriving (Show, Eq)
 
 testProcessManager :: ProcessManager PMState TestEvent TestCommand
 testProcessManager =
   ProcessManager
-    { processManagerProjection = Projection (PMState []) handleEvent,
-      processManagerReact = react
+    { projection = Projection (PMState []) handleEvent,
+      react = reactFn
     }
   where
-    handleEvent state (StreamEvent _ _ _ (TransferInitiated target amount)) =
-      state {pmPendingTransfers = (target, amount) : pmPendingTransfers state}
-    handleEvent state _ = state
+    handleEvent st (StreamEvent _ _ _ (TransferInitiated target amount)) =
+      st {pendingTransfers = (target, amount) : st.pendingTransfers}
+    handleEvent st _ = st
 
-    react _state (StreamEvent _ _ _ (TransferInitiated target amount)) =
+    reactFn _st (StreamEvent _ _ _ (TransferInitiated target amount)) =
       [IssueCommand target (AcceptCredit amount)]
-    react _state (StreamEvent sourceId _ _ (Credited _)) =
+    reactFn _st (StreamEvent sourceId _ _ (Credited _)) =
       [IssueCommand sourceId (AcceptCredit 0)]
-    react _ _ = []
+    reactFn _ _ = []
 
 spec :: Spec
 spec = do
@@ -44,13 +44,13 @@ spec = do
     it "should produce IssueCommand for transfer events" $ do
       let target = uuidFromInteger 2
           event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50)
-          effects = processManagerReact testProcessManager (PMState []) event
+          effects = testProcessManager.react (PMState []) event
       effects `shouldBe` [IssueCommand target (AcceptCredit 50)]
 
     it "should produce IssueCommand for credit events" $ do
       let source = uuidFromInteger 1
           event = StreamEvent source 0 (emptyMetadata "") (Credited 100)
-          effects = processManagerReact testProcessManager (PMState []) event
+          effects = testProcessManager.react (PMState []) event
       effects `shouldBe` [IssueCommand source (AcceptCredit 0)]
 
     it "should return empty list for unmatched events" $ do
@@ -63,7 +63,7 @@ spec = do
 
   describe "ProcessManager projection" $ do
     it "should fold state correctly" $ do
-      let proj = processManagerProjection testProcessManager
+      let proj = testProcessManager.projection
           target = uuidFromInteger 2
           events =
             [ StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50),
@@ -71,7 +71,7 @@ spec = do
               StreamEvent (uuidFromInteger 1) 2 (emptyMetadata "") (TransferInitiated target 30)
             ]
           finalState = latestProjection proj events
-      pmPendingTransfers finalState `shouldBe` [(target, 30), (target, 50)]
+      finalState.pendingTransfers `shouldBe` [(target, 30), (target, 50)]
 
   describe "runProcessManagerEffects" $ do
     it "should dispatch commands via the dispatch function" $ do

@@ -16,7 +16,7 @@ spec = describe "resilientPollingSubscription" $ do
     let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter tvar)
         globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader tvar)
         uuid = uuidFromInteger 1
-    _ <- storeEvents writer uuid NoStream [10 :: Int, 20]
+    _ <- writer.storeEvents uuid NoStream [10 :: Int, 20]
 
     failRef <- newIORef True
     let wrappedReader =
@@ -26,25 +26,25 @@ spec = describe "resilientPollingSubscription" $ do
               then do
                 liftIO $ writeIORef failRef False
                 liftIO $ throwIO (userError "transient DB error" :: IOException)
-              else getEvents globalReader range
+              else globalReader.getEvents range
 
     checkpointRef <- newIORef (0 :: SequenceNumber)
     let checkpoint = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
 
     deliveredRef <- newIORef ([] :: [Int])
     let handler = EventHandler $ \ge ->
-          modifyIORef deliveredRef (++ [streamEventPayload $ streamEventPayload ge])
+          modifyIORef deliveredRef (++ [ge.payload.payload])
 
     callbackRef <- newIORef (0 :: Int)
     let config =
           defaultRetryConfig
-            { retryInitialDelayMs = 10,
-              retryMaxDelayMs = 100,
-              retryOnErrorCallback = \_ n -> writeIORef callbackRef n
+            { initialDelayMs = 10,
+              maxDelayMs = 100,
+              onErrorCallback = \_ n -> writeIORef callbackRef n
             }
 
     let sub = resilientPollingSubscription id wrappedReader checkpoint 50 config
-    tid <- forkIO $ runSubscription sub handler
+    tid <- forkIO $ sub.runSubscription handler
     threadDelay 500000
     killThread tid
 
@@ -54,9 +54,6 @@ spec = describe "resilientPollingSubscription" $ do
     callbackCount `shouldBe` 1
 
   it "re-throws when retryOnError returns False" $ do
-    tvar <- eventMapTVar
-    let globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader tvar)
-
     let wrappedReader =
           EventStoreReader $ \_ ->
             liftIO $ throwIO (userError "fatal error" :: IOException)
@@ -66,19 +63,20 @@ spec = describe "resilientPollingSubscription" $ do
 
     let config =
           defaultRetryConfig
-            { retryOnError = const (return False)
+            { onError = const (return False)
             }
 
     let sub = resilientPollingSubscription id wrappedReader checkpoint 50 config
         handler = EventHandler $ \_ -> return ()
 
-    runSubscription sub handler `shouldThrow` anyIOException
+    sub.runSubscription handler `shouldThrow` anyIOException
 
   it "invokes retryOnErrorCallback with correct consecutive count" $ do
     tvar <- eventMapTVar
 
     callCountRef <- newIORef (0 :: Int)
-    let wrappedReader =
+    let fallbackReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader tvar)
+        wrappedReader =
           EventStoreReader $ \_ -> do
             n <- liftIO $ readIORef callCountRef
             if n < 3
@@ -86,7 +84,7 @@ spec = describe "resilientPollingSubscription" $ do
                 liftIO $ modifyIORef callCountRef (+ 1)
                 liftIO $ throwIO (userError "error" :: IOException)
               else
-                getEvents (runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader tvar)) (allEvents ())
+                fallbackReader.getEvents (allEvents ())
 
     checkpointRef <- newIORef (0 :: SequenceNumber)
     let checkpoint = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
@@ -94,15 +92,15 @@ spec = describe "resilientPollingSubscription" $ do
     callbackCounts <- newIORef ([] :: [Int])
     let config =
           defaultRetryConfig
-            { retryInitialDelayMs = 10,
-              retryMaxDelayMs = 100,
-              retryOnErrorCallback = \_ n -> modifyIORef callbackCounts (++ [n])
+            { initialDelayMs = 10,
+              maxDelayMs = 100,
+              onErrorCallback = \_ n -> modifyIORef callbackCounts (++ [n])
             }
 
     let sub = resilientPollingSubscription id wrappedReader checkpoint 50 config
         handler = EventHandler $ \_ -> return ()
 
-    tid <- forkIO $ runSubscription sub handler
+    tid <- forkIO $ sub.runSubscription handler
     threadDelay 500000
     killThread tid
 

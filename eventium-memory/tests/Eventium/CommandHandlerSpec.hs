@@ -60,8 +60,8 @@ spec = do
       result `shouldBe` Right [10]
 
       -- Verify events are stored
-      events <- getEvents reader (allEvents uuid)
-      map streamEventPayload events `shouldBe` [10]
+      events <- reader.getEvents (allEvents uuid)
+      map (.payload) events `shouldBe` [10]
 
     it "should return CommandRejected on domain error" $ do
       tvar <- eventMapTVar
@@ -72,7 +72,7 @@ spec = do
       result `shouldBe` Left (CommandRejected Overflow)
 
       -- Verify no events stored
-      events <- getEvents reader (allEvents uuid)
+      events <- reader.getEvents (allEvents uuid)
       events `shouldBe` []
 
     it "should return ConcurrencyConflict on write failure" $ do
@@ -102,8 +102,8 @@ spec = do
       result3 `shouldBe` Left (CommandRejected Overflow)
 
       -- Verify only two events stored
-      events <- getEvents reader (allEvents uuid)
-      map streamEventPayload events `shouldBe` [30, 40]
+      events <- reader.getEvents (allEvents uuid)
+      map (.payload) events `shouldBe` [30, 40]
 
   describe "codecCommandHandler" $ do
     it "should map through codecs on success" $ do
@@ -111,18 +111,18 @@ spec = do
           cmdCodec = Codec show (Just . read)
           wrapped = codecCommandHandler eventCodec cmdCodec counterHandler
 
-      commandHandlerDecide wrapped 0 "10" `shouldBe` Right ["10"]
+      wrapped.decide 0 "10" `shouldBe` Right ["10"]
 
     it "should error when command decoding fails" $ do
       let eventCodec = Codec show (Just . read)
           cmdCodec = Codec (show :: Int -> String) (\_ -> Nothing :: Maybe Int)
           wrapped = codecCommandHandler eventCodec cmdCodec counterHandler
 
-      evaluate (commandHandlerDecide wrapped 0 "anything") `shouldThrow` (\(DecodeError ctx _) -> ctx == "codecCommandHandler")
+      evaluate (wrapped.decide 0 "anything") `shouldThrow` (\(DecodeError ctx _) -> ctx == "codecCommandHandler")
 
     it "should propagate domain errors through codec" $ do
       let eventCodec = Codec show (Just . read)
           cmdCodec = Codec show (Just . read)
           wrapped = codecCommandHandler eventCodec cmdCodec counterHandler
 
-      commandHandlerDecide wrapped 0 "150" `shouldBe` Left Overflow
+      wrapped.decide 0 "150" `shouldBe` Left Overflow
