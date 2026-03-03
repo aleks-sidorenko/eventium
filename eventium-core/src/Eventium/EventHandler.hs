@@ -64,7 +64,7 @@ codecEventHandler ::
   EventHandler m event ->
   EventHandler m encoded
 codecEventHandler codec (EventHandler h) = EventHandler $ \e ->
-  case decode codec e of
+  case codec.decode e of
     Just a -> h a
     Nothing -> throw $ DecodeError "codecEventHandler" "Failed to decode event"
 
@@ -78,7 +78,7 @@ lenientCodecEventHandler ::
   Codec event encoded ->
   EventHandler m event ->
   EventHandler m encoded
-lenientCodecEventHandler codec = eventHandlerMapMaybe (decode codec)
+lenientCodecEventHandler codec = eventHandlerMapMaybe codec.decode
 
 -- | Adapt an 'EventHandler' using a 'TypeEmbedding'. Events that do not
 -- belong to the embedded subset are silently dropped.
@@ -87,4 +87,4 @@ embeddedEventHandler ::
   TypeEmbedding event adapted ->
   EventHandler m event ->
   EventHandler m adapted
-embeddedEventHandler emb = eventHandlerMapMaybe (extract emb)
+embeddedEventHandler emb = eventHandlerMapMaybe emb.extract

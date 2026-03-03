@@ -17,9 +17,9 @@ where
 -- and the start/stop points for the query.
 data QueryRange key position
   = QueryRange
-  { queryRangeKey :: key,
-    queryRangeStart :: QueryStart position,
-    queryRangeLimit :: QueryLimit position
+  { key :: key,
+    start :: QueryStart position,
+    limit :: QueryLimit position
   }
   deriving (Show, Eq)
 

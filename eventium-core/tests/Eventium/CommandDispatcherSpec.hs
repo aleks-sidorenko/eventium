@@ -5,7 +5,7 @@ module Eventium.CommandDispatcherSpec (spec) where
 import Data.IORef
 import Eventium.CommandDispatcher
 import Eventium.CommandHandler
-import Eventium.ProcessManager (CommandDispatchResult (..), RejectionReason (..), dispatchCommand)
+import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher (..), RejectionReason (..))
 import Eventium.Projection
 import Eventium.Store.Class
 import Eventium.UUID
@@ -27,13 +27,13 @@ counterProjection =
     Decremented -> s - 1
 
 counterHandler :: CommandHandler Counter CounterEvent CounterCommand CounterError
-counterHandler = CommandHandler decide counterProjection
+counterHandler = CommandHandler decide' counterProjection
   where
-    decide _ Increment = Right [Incremented]
-    decide s Decrement
+    decide' _ Increment = Right [Incremented]
+    decide' s Decrement
       | s <= 0 = Left AlreadyZero
       | otherwise = Right [Decremented]
-    decide _ Unknown = Right []
+    decide' _ Unknown = Right []
 
 -- | Simple IORef-based event store for testing.
 mkTestStore :: IO (VersionedEventStoreWriter IO CounterEvent, VersionedEventStoreReader IO CounterEvent)
@@ -50,10 +50,8 @@ mkTestStore = do
         pure $ filterByQuery query allEvts
   pure (writer, reader)
   where
-    filterByQuery query events =
-      case queryRangeKey query of
-        uuid ->
-          filter (\(StreamEvent k _ _ _) -> k == uuid) events
+    filterByQuery (QueryRange uuid _ _) events =
+      filter (\(StreamEvent k _ _ _) -> k == uuid) events
 
 spec :: Spec
 spec = describe "CommandDispatcher" $ do
@@ -64,7 +62,7 @@ spec = describe "CommandDispatcher" $ do
       let handlers = [mkAggregateHandler counterHandler]
           dispatcher = commandHandlerDispatcher writer reader handlers
 
-      result <- dispatchCommand dispatcher (uuidFromInteger 1) Increment
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Increment
       result `shouldBe` CommandSucceeded
 
     it "reports failure when command is rejected" $ do
@@ -74,7 +72,7 @@ spec = describe "CommandDispatcher" $ do
           dispatcher = commandHandlerDispatcher writer reader handlers
 
       -- Counter starts at 0, Decrement should fail
-      result <- dispatchCommand dispatcher (uuidFromInteger 1) Decrement
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Decrement
       result `shouldBe` CommandFailed (RejectionReason "AlreadyZero")
 
     it "returns CommandSucceeded when no handler matches" $ do
@@ -84,5 +82,5 @@ spec = describe "CommandDispatcher" $ do
           dispatcher = commandHandlerDispatcher writer reader handlers
 
       -- Unknown returns Right [], so no handler "matches" (produces events)
-      result <- dispatchCommand dispatcher (uuidFromInteger 1) Unknown
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Unknown
       result `shouldBe` CommandSucceeded

@@ -16,7 +16,7 @@ spec = do
   describe "handleEvent" $ do
     it "should process a single event" $ do
       ref <- newIORef ([] :: [Int])
-      handleEvent (recordingHandler ref) 42
+      (recordingHandler ref).handleEvent 42
       readIORef ref `shouldReturn` [42]
 
   describe "handleEvents" $ do
@@ -34,8 +34,8 @@ spec = do
     it "should adapt the event type via contramap" $ do
       ref <- newIORef ([] :: [Int])
       let handler = contramap length (recordingHandler ref)
-      handleEvent handler "hello"
-      handleEvent handler "hi"
+      handler.handleEvent "hello"
+      handler.handleEvent "hi"
       readIORef ref `shouldReturn` [5, 2]
 
   describe "Semigroup instance" $ do
@@ -43,14 +43,14 @@ spec = do
       ref1 <- newIORef ([] :: [Int])
       ref2 <- newIORef ([] :: [Int])
       let combined = recordingHandler ref1 <> recordingHandler ref2
-      handleEvent combined 10
-      handleEvent combined 20
+      combined.handleEvent 10
+      combined.handleEvent 20
       readIORef ref1 `shouldReturn` [10, 20]
       readIORef ref2 `shouldReturn` [10, 20]
 
   describe "Monoid instance" $ do
     it "mempty should be a no-op" $ do
-      handleEvent (mempty :: EventHandler IO Int) 42
+      (mempty :: EventHandler IO Int).handleEvent 42
     -- No crash, no observable effect
 
     it "mconcat should compose multiple handlers" $ do
@@ -58,7 +58,7 @@ spec = do
       ref2 <- newIORef ([] :: [Int])
       ref3 <- newIORef ([] :: [Int])
       let combined = mconcat [recordingHandler ref1, recordingHandler ref2, recordingHandler ref3]
-      handleEvent combined 99
+      combined.handleEvent 99
       readIORef ref1 `shouldReturn` [99]
       readIORef ref2 `shouldReturn` [99]
       readIORef ref3 `shouldReturn` [99]

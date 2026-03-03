@@ -1,5 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Eventium.ProjectionCache.Types
   ( ProjectionCache (..),
@@ -56,10 +55,10 @@ runProjectionCacheUsing ::
   (forall a. mstore a -> m a) ->
   ProjectionCache key position encoded mstore ->
   ProjectionCache key position encoded m
-runProjectionCacheUsing runCache ProjectionCache {..} =
+runProjectionCacheUsing runCache pc =
   ProjectionCache
-    { storeProjectionSnapshot = \uuid version state -> runCache $ storeProjectionSnapshot uuid version state,
-      loadProjectionSnapshot = runCache . loadProjectionSnapshot
+    { storeProjectionSnapshot = \uuid version st -> runCache $ pc.storeProjectionSnapshot uuid version st,
+      loadProjectionSnapshot = runCache . pc.loadProjectionSnapshot
     }
 
 -- | Wraps a 'ProjectionCache' and transparently encodes/decodes events for
@@ -70,13 +69,13 @@ codecProjectionCache ::
   Codec state encoded ->
   ProjectionCache key position encoded m ->
   ProjectionCache key position state m
-codecProjectionCache codec ProjectionCache {..} =
+codecProjectionCache codec pc =
   ProjectionCache storeProjectionSnapshot' loadProjectionSnapshot'
   where
-    storeProjectionSnapshot' uuid version = storeProjectionSnapshot uuid version . encode codec
+    storeProjectionSnapshot' uuid version = pc.storeProjectionSnapshot uuid version . codec.encode
     loadProjectionSnapshot' uuid = do
-      mState <- loadProjectionSnapshot uuid
-      return $ mState >>= traverse (decode codec)
+      mState <- pc.loadProjectionSnapshot uuid
+      return $ mState >>= traverse codec.decode
 
 -- | Like 'getLatestVersionedProjection', but uses a 'ProjectionCache' if it contains
 -- more recent state.
@@ -86,8 +85,8 @@ getLatestVersionedProjectionWithCache ::
   VersionedProjectionCache state m ->
   VersionedStreamProjection state event ->
   m (VersionedStreamProjection state event)
-getLatestVersionedProjectionWithCache store cache projection =
-  getLatestProjectionWithCache' cache projection (streamProjectionKey projection) >>= getLatestStreamProjection store
+getLatestVersionedProjectionWithCache store cache proj =
+  getLatestProjectionWithCache' cache proj proj.key >>= getLatestStreamProjection store
 
 -- | Like 'getLatestGlobalProjection', but uses a 'ProjectionCache' if it
 -- contains more recent state.
@@ -98,8 +97,8 @@ getLatestGlobalProjectionWithCache ::
   GlobalStreamProjection state event ->
   key ->
   m (GlobalStreamProjection state event)
-getLatestGlobalProjectionWithCache store cache projection key =
-  getLatestProjectionWithCache' cache projection key >>= getLatestStreamProjection store
+getLatestGlobalProjectionWithCache store cache proj k =
+  getLatestProjectionWithCache' cache proj k >>= getLatestStreamProjection store
 
 getLatestProjectionWithCache' ::
   (Monad m, Ord position) =>
@@ -107,17 +106,17 @@ getLatestProjectionWithCache' ::
   StreamProjection projKey position state event ->
   key ->
   m (StreamProjection projKey position state event)
-getLatestProjectionWithCache' cache projection key = do
-  mLatestState <- loadProjectionSnapshot cache key
-  let mkProjection' (position, state) =
-        if position > streamProjectionPosition projection
+getLatestProjectionWithCache' cache proj k = do
+  mLatestState <- cache.loadProjectionSnapshot k
+  let mkProjection' (pos, st) =
+        if pos > proj.position
           then
-            projection
-              { streamProjectionPosition = position,
-                streamProjectionState = state
+            proj
+              { position = pos,
+                state = st
               }
-          else projection
-  return $ maybe projection mkProjection' mLatestState
+          else proj
+  return $ maybe proj mkProjection' mLatestState
 
 -- | Loads the latest projection state from the cache/store and stores this
 -- value back into the projection cache.
@@ -127,9 +126,9 @@ updateProjectionCache ::
   VersionedProjectionCache state m ->
   VersionedStreamProjection state event ->
   m ()
-updateProjectionCache reader cache projection = do
-  StreamProjection {..} <- getLatestVersionedProjectionWithCache reader cache projection
-  storeProjectionSnapshot cache streamProjectionKey streamProjectionPosition streamProjectionState
+updateProjectionCache reader cache proj = do
+  sp <- getLatestVersionedProjectionWithCache reader cache proj
+  cache.storeProjectionSnapshot sp.key sp.position sp.state
 
 -- | Analog of 'updateProjectionCache' for a 'GlobalStreamProjectionCache'.
 updateGlobalProjectionCache ::
@@ -139,6 +138,6 @@ updateGlobalProjectionCache ::
   GlobalStreamProjection state event ->
   key ->
   m ()
-updateGlobalProjectionCache reader cache projection key = do
-  StreamProjection {..} <- getLatestGlobalProjectionWithCache reader cache projection key
-  storeProjectionSnapshot cache key streamProjectionPosition streamProjectionState
+updateGlobalProjectionCache reader cache proj k = do
+  sp <- getLatestGlobalProjectionWithCache reader cache proj k
+  cache.storeProjectionSnapshot k sp.position sp.state

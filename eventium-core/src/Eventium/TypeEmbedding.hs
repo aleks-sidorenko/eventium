@@ -35,8 +35,8 @@ data TypeEmbedding a b = TypeEmbedding
 composeEmbeddings :: TypeEmbedding a b -> TypeEmbedding b c -> TypeEmbedding a c
 composeEmbeddings emb1 emb2 =
   TypeEmbedding
-    { embed = embed emb2 . embed emb1,
-      extract = extract emb2 >=> extract emb1
+    { embed = emb2.embed . emb1.embed,
+      extract = emb2.extract >=> emb1.extract
     }
 
 -- | Identity embedding where no type conversion is needed.
