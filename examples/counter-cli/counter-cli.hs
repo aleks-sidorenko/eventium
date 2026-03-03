@@ -26,7 +26,7 @@ readAndHandleCommand writer reader = do
 
   -- Get current state and print it out
   latestStreamProjection <- atomically $ getLatestStreamProjection reader (versionedStreamProjection uuid counterProjection)
-  let currentState = streamProjectionState latestStreamProjection
+  let currentState = latestStreamProjection.state
   putStrLn $ "Current state: " ++ show currentState
 
   -- Ask user for command
@@ -37,10 +37,10 @@ readAndHandleCommand writer reader = do
   case readMay input of
     Nothing -> putStrLn "Unknown command"
     (Just command) -> do
-      case commandHandlerDecide counterCommandHandler currentState command of
+      case counterCommandHandler.decide currentState command of
         Right events -> do
           putStrLn $ "Events generated: " ++ show events
-          void . atomically $ storeEvents writer uuid AnyPosition events
+          void . atomically $ writer.storeEvents uuid AnyPosition events
         Left err -> absurd err
 
   putStrLn ""

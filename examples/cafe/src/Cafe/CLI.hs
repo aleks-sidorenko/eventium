@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Cafe.CLI
   ( cliMain,
     printJSONPretty,
@@ -24,14 +22,14 @@ import Safe
 
 cliMain :: IO ()
 cliMain = do
-  Options {..} <- runOptionsParser
+  opts <- runOptionsParser
 
   -- Set up DB connection
-  pool <- runNoLoggingT $ createSqlitePool (pack optionsDatabaseFile) 1
+  pool <- runNoLoggingT $ createSqlitePool (pack opts.databaseFile) 1
   initializeSqliteEventStore defaultSqlEventStoreConfig pool
   void $ liftIO $ runSqlPool (runMigrationSilent migrateTabEntity) pool
 
-  runCLI pool (runCLICommand optionsCommand)
+  runCLI pool (runCLICommand opts.command)
 
 runCLICommand :: Command -> CLI ()
 runCLICommand OpenTab = do
@@ -40,13 +38,13 @@ runCLICommand OpenTab = do
 runCLICommand ListMenu = liftIO $ do
   putStrLn "Food:"
   let printPair (i, MenuItem desc price) = putStrLn $ show i ++ ": " ++ desc ++ " ($" ++ show price ++ ")"
-  mapM_ printPair (zip [0 :: Int ..] $ map unFood allFood)
+  mapM_ printPair (zip [0 :: Int ..] $ map (\(Food mi) -> mi) allFood)
   putStrLn "Drinks:"
-  mapM_ printPair (zip [0 :: Int ..] $ map unDrink allDrinks)
+  mapM_ printPair (zip [0 :: Int ..] $ map (\(Drink mi) -> mi) allDrinks)
 runCLICommand (ViewTab tabId) = do
   uuid <- fromJustNote "Could not find tab with given id" <$> runDB (getTabUuid tabId)
-  StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
-  liftIO $ printJSONPretty streamProjectionState
+  sp <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
+  liftIO $ printJSONPretty sp.state
 runCLICommand (TabCommand tabId command) = do
   uuid <- fromJustNote "Could not find tab with given id" <$> runDB (getTabUuid tabId)
   result <-
@@ -61,9 +59,9 @@ runCLICommand (TabCommand tabId command) = do
     Left err -> liftIO . putStrLn $ "Error: " ++ show err
     Right events -> do
       liftIO . putStrLn $ "Events: " ++ show events
-      StreamProjection {..} <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
+      sp <- runDB $ getLatestStreamProjection cliEventStoreReader (versionedStreamProjection uuid (codecProjection jsonStringCodec tabProjection))
       liftIO . putStrLn $ "Latest state:"
-      liftIO $ printJSONPretty streamProjectionState
+      liftIO $ printJSONPretty sp.state
 
 printJSONPretty :: (ToJSON a) => a -> IO ()
 printJSONPretty = BSL.putStrLn . encodePretty' (defConfig {confIndent = Spaces 2})

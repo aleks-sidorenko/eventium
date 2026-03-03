@@ -47,4 +47,4 @@ openTab = do
 
 -- | Given the tab id, attempts to load the tab and return the UUID.
 getTabUuid :: (MonadIO m) => TabEntityId -> SqlPersistT m (Maybe UUID)
-getTabUuid tabId = fmap tabEntityProjectionId <$> get tabId
+getTabUuid tabId = fmap (\(TabEntity uid) -> uid) <$> get tabId

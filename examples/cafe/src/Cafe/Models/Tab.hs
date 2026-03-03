@@ -19,9 +19,7 @@ module Cafe.Models.Tab
   )
 where
 
-import Control.Lens
 import Data.Aeson
-import Data.Aeson.Casing
 import Data.Aeson.TH
 import Data.List (foldl')
 import Data.Maybe (catMaybes, isJust)
@@ -29,12 +27,12 @@ import Eventium
 
 data MenuItem
   = MenuItem
-  { menuItemDescription :: String,
-    menuItemPrice :: Double
+  { description :: String,
+    price :: Double
   }
   deriving (Show, Eq)
 
-deriveJSON (aesonPrefix camelCase) ''MenuItem
+deriveJSON defaultOptions ''MenuItem
 
 newtype Drink = Drink {unDrink :: MenuItem}
   deriving (Show, Eq, FromJSON, ToJSON)
@@ -44,74 +42,73 @@ newtype Food = Food {unFood :: MenuItem}
 
 data TabState
   = TabState
-  { _tabStateIsOpen :: Bool,
+  { isOpen :: Bool,
     -- | All drinks that need to be served. 'Nothing' indicates the drink was
     -- served or cancelled.
-    _tabStateOutstandingDrinks :: [Maybe Drink],
+    outstandingDrinks :: [Maybe Drink],
     -- | All food that needs to be made. 'Nothing' indicates the food was made
     -- or cancelled.
-    _tabStateOutstandingFood :: [Maybe Food],
+    outstandingFood :: [Maybe Food],
     -- | All food that has been made. 'Nothing' indicates the food was served.
-    _tabStatePreparedFood :: [Maybe Food],
+    preparedFood :: [Maybe Food],
     -- | All items that have been served.
-    _tabStateServedItems :: [MenuItem]
+    servedItems :: [MenuItem]
   }
   deriving (Show, Eq)
 
-makeLenses ''TabState
-deriveJSON (aesonPrefix camelCase) ''TabState
+deriveJSON defaultOptions ''TabState
 
 tabSeed :: TabState
 tabSeed = TabState True [] [] [] []
 
 data TabEvent
   = DrinksOrdered
-      { _tabEventDrinks :: [Drink]
+      { drinks :: [Drink]
       }
   | FoodOrdered
-      { _tabEventFood :: [Food]
+      { food :: [Food]
       }
   | DrinksCancelled
-      { _tabEventDrinkIndexes :: [Int]
+      { drinkIndexes :: [Int]
       }
   | FoodCancelled
-      { _tabEventFoodIndexes :: [Int]
+      { foodIndexes :: [Int]
       }
   | DrinksServed
-      { _tabEventDrinkIndexes :: [Int]
+      { drinkIndexes :: [Int]
       }
   | FoodPrepared
-      { _tabEventFoodIndexes :: [Int]
+      { foodIndexes :: [Int]
       }
   | FoodServed
-      { _tabEventFoodIndexes :: [Int]
+      { foodIndexes :: [Int]
       }
   | TabClosed Double
   deriving (Show, Eq)
 
-deriveJSON (aesonPrefix camelCase) ''TabEvent
+deriveJSON defaultOptions ''TabEvent
 
 applyTabEvent :: TabState -> TabEvent -> TabState
-applyTabEvent state (DrinksOrdered drinks) = state & tabStateOutstandingDrinks %~ (++ map Just drinks)
-applyTabEvent state (FoodOrdered food) = state & tabStateOutstandingFood %~ (++ map Just food)
-applyTabEvent state (DrinksCancelled indexes) = state & tabStateOutstandingDrinks %~ setIndexesToNothing indexes
-applyTabEvent state (FoodCancelled indexes) = state & tabStateOutstandingFood %~ setIndexesToNothing indexes
+applyTabEvent state (DrinksOrdered newDrinks) = state {outstandingDrinks = state.outstandingDrinks ++ map Just newDrinks}
+applyTabEvent state (FoodOrdered newFood) = state {outstandingFood = state.outstandingFood ++ map Just newFood}
+applyTabEvent state (DrinksCancelled indexes) = state {outstandingDrinks = setIndexesToNothing indexes state.outstandingDrinks}
+applyTabEvent state (FoodCancelled indexes) = state {outstandingFood = setIndexesToNothing indexes state.outstandingFood}
 applyTabEvent state (DrinksServed indexes) =
   state
-    & tabStateServedItems
-      %~ (\items -> items ++ fmap unDrink (catMaybes $ getListItemsByIndexes indexes (state ^. tabStateOutstandingDrinks)))
-    & tabStateOutstandingDrinks %~ setIndexesToNothing indexes
+    { servedItems = state.servedItems ++ fmap (\(Drink mi) -> mi) (catMaybes $ getListItemsByIndexes indexes state.outstandingDrinks),
+      outstandingDrinks = setIndexesToNothing indexes state.outstandingDrinks
+    }
 applyTabEvent state (FoodPrepared indexes) =
   state
-    & tabStatePreparedFood
-      %~ (\items -> items ++ getListItemsByIndexes indexes (state ^. tabStateOutstandingFood))
-    & tabStateOutstandingFood %~ setIndexesToNothing indexes
+    { preparedFood = state.preparedFood ++ getListItemsByIndexes indexes state.outstandingFood,
+      outstandingFood = setIndexesToNothing indexes state.outstandingFood
+    }
 applyTabEvent state (FoodServed indexes) =
   state
-    & tabStateServedItems
-      %~ (\items -> items ++ fmap unFood (catMaybes $ getListItemsByIndexes indexes (state ^. tabStatePreparedFood)))
-    & tabStatePreparedFood %~ setIndexesToNothing indexes
-applyTabEvent state (TabClosed _) = state & tabStateIsOpen .~ False
+    { servedItems = state.servedItems ++ fmap (\(Food mi) -> mi) (catMaybes $ getListItemsByIndexes indexes state.preparedFood),
+      preparedFood = setIndexesToNothing indexes state.preparedFood
+    }
+applyTabEvent state (TabClosed _) = state {isOpen = False}
 
 setIndexesToNothing :: [Int] -> [Maybe a] -> [Maybe a]
 setIndexesToNothing indexes = zipWith (\i x -> if i `elem` indexes then Nothing else x) [0 ..]
@@ -142,18 +139,18 @@ data TabCommandError
   deriving (Show, Eq)
 
 applyTabCommand :: TabState -> TabCommand -> Either TabCommandError [TabEvent]
-applyTabCommand TabState {_tabStateIsOpen = False} _ = Left TabAlreadyClosed
+applyTabCommand TabState {isOpen = False} _ = Left TabAlreadyClosed
 applyTabCommand state (CloseTab cash)
   | amountOfNonServedItems > 0 = Left TabHasUnservedItems
   | cash < totalServedWorth = Left MustPayEnough
   | otherwise = Right [TabClosed cash]
   where
     amountOfNonServedItems =
-      length (filter isJust $ state ^. tabStateOutstandingDrinks)
-        + length (filter isJust $ state ^. tabStateOutstandingFood)
-        + length (filter isJust $ state ^. tabStatePreparedFood)
-    totalServedWorth = foldl' (+) 0 (fmap menuItemPrice $ state ^. tabStateServedItems)
-applyTabCommand _ (PlaceOrder food drinks) = Right [FoodOrdered food, DrinksOrdered drinks]
+      length (filter isJust state.outstandingDrinks)
+        + length (filter isJust state.outstandingFood)
+        + length (filter isJust state.preparedFood)
+    totalServedWorth = foldl' (+) 0 (fmap (.price) (state.servedItems))
+applyTabCommand _ (PlaceOrder newFood newDrinks) = Right [FoodOrdered newFood, DrinksOrdered newDrinks]
 -- TODO: Check if index exceeds list length or if item is already marked null
 -- for the next 3 commands.
 applyTabCommand _ (MarkDrinksServed indexes) = Right [DrinksServed indexes]

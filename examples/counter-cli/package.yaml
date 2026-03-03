@@ -22,3 +22,7 @@ executables:
   counter-cli:
     main: counter-cli.hs
     ghc-options: -Wall
+    default-extensions:
+      - NoFieldSelectors
+      - DuplicateRecordFields
+      - OverloadedRecordDot

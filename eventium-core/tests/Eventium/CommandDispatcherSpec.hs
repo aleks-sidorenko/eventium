@@ -50,8 +50,8 @@ mkTestStore = do
         pure $ filterByQuery query allEvts
   pure (writer, reader)
   where
-    filterByQuery (QueryRange uuid _ _) events =
-      filter (\(StreamEvent k _ _ _) -> k == uuid) events
+    filterByQuery (QueryRange uuid _ _) =
+      filter (\(StreamEvent k _ _ _) -> k == uuid)
 
 spec :: Spec
 spec = describe "CommandDispatcher" $ do
