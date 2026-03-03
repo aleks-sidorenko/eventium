@@ -12,10 +12,10 @@ Core abstractions for building event-sourced applications in Haskell.
 
 ```haskell
 data StreamEvent key position event = StreamEvent
-  { streamEventKey      :: key
-  , streamEventPosition :: position
-  , streamEventMetadata :: EventMetadata
-  , streamEventPayload  :: event
+  { key      :: key
+  , position :: position
+  , metadata :: EventMetadata
+  , payload  :: event
   }
 ```
 
@@ -38,8 +38,8 @@ Polymorphic over key, position, monad, and event types. `runEventStoreReaderUsin
 
 ```haskell
 data Projection state event = Projection
-  { projectionSeed         :: state
-  , projectionEventHandler :: state -> event -> state
+  { seed         :: state
+  , eventHandler :: state -> event -> state
   }
 ```
 
@@ -49,8 +49,8 @@ Pure fold for rebuilding state from events. Used for both aggregates (write side
 
 ```haskell
 data CommandHandler state event command err = CommandHandler
-  { commandHandlerDecide     :: state -> command -> Either err [event]
-  , commandHandlerProjection :: Projection state event
+  { decide     :: state -> command -> Either err [event]
+  , projection :: Projection state event
   }
 ```
 
@@ -60,9 +60,9 @@ Validates a command against current state, returning either a domain error or ne
 
 ```haskell
 data ProcessManager state event command = ProcessManager
-  { processManagerProjection :: Projection state (VersionedStreamEvent event)
-  , processManagerReact      :: state -> VersionedStreamEvent event
-                             -> [ProcessManagerEffect command]
+  { projection :: Projection state (VersionedStreamEvent event)
+  , react      :: state -> VersionedStreamEvent event
+               -> [ProcessManagerEffect command]
   }
 
 data ProcessManagerEffect command

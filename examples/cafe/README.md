@@ -39,7 +39,7 @@ let checkpoint = CheckpointStore (readIORef seqRef) (writeIORef seqRef)
     sub = pollingSubscription globalReader checkpoint 1000  -- poll every 1000ms
     handler = EventHandler $ \globalEvent -> ...
 
-runSubscription sub handler
+sub.runSubscription handler
 ```
 
 This demonstrates `EventSubscription`, `CheckpointStore`, and `EventHandler`

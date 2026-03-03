@@ -6,9 +6,12 @@ See the [root changelog](../CHANGELOG.md) for full details.
 
 ### Breaking changes
 
+- Record field prefixes removed from all core types. Fields accessed via
+  `OverloadedRecordDot` (e.g. `projection.seed`, `event.metadata`).
+  `NoFieldSelectors` and `DuplicateRecordFields` enabled as default extensions.
 - `StreamEvent` now has 4 fields (added `EventMetadata`).
-- `CommandHandler` gained an `err` type parameter; `commandHandlerHandler` renamed to `commandHandlerDecide`.
-- `ProcessManager` is now pure: `processManagerReact` returns `[ProcessManagerEffect]`. `ProcessManagerEffect` only supports `IssueCommand` (removed `EmitEvent`).
+- `CommandHandler` gained an `err` type parameter; `commandHandlerHandler` renamed to `decide`.
+- `ProcessManager` is now pure: `react` returns `[ProcessManagerEffect]`. `ProcessManagerEffect` only supports `IssueCommand` (removed `EmitEvent`).
 - `EventPublisher`: removed `synchronousEventBusWrapper`; added `publishingEventStoreWriter` and `synchronousPublisher`.
 - `PollingPeriodSeconds` (Double) replaced by `PollingIntervalMillis` (Int).
 - Codec wrapper argument order changed (codec comes first).
@@ -16,6 +19,7 @@ See the [root changelog](../CHANGELOG.md) for full details.
 
 ### Additions
 
+- `NoFieldSelectors`, `DuplicateRecordFields`, `OverloadedRecordDot` default extensions.
 - `EventMetadata`, `emptyMetadata`.
 - `lenientCodecEventStoreReader`, `lenientCodecProjection`.
 - `runProjectionSubscription`, `eventHandlerMapMaybe`.

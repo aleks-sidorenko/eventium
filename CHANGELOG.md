@@ -6,19 +6,35 @@ Major refactoring of the core API.
 
 ### Breaking changes
 
+- **Record field prefixes removed** across all packages. All record types now use
+  short, unprefixed field names with `NoFieldSelectors`, `DuplicateRecordFields`,
+  and `OverloadedRecordDot` extensions. Access fields via dot syntax
+  (`projection.seed`, `event.metadata`). Key renames:
+  - `Projection`: `projectionSeed` -> `seed`, `projectionEventHandler` -> `eventHandler`
+  - `StreamProjection`: `streamProjectionKey` -> `key`, `streamProjectionState` -> `state`, etc.
+  - `StreamEvent`: `streamEventKey` -> `key`, `streamEventPayload` -> `payload`, etc.
+  - `EventMetadata`: `eventMetadataEventType` -> `eventType`, etc.
+  - `CommandHandler`: `commandHandlerDecide` -> `decide`, `commandHandlerProjection` -> `projection`
+  - `ProcessManager`: `processManagerProjection` -> `projection`, `processManagerReact` -> `react`
+  - `QueryRange`: `queryRangeKey` -> `key`, `queryRangeStart` -> `start`, `queryRangeLimit` -> `limit`
+  - `RetryConfig`: `retryInitialDelayMs` -> `initialDelayMs`, etc.
+  - `DecodeError`/`EncodeError`: `decodeErrorContext` -> `context`, `decodeErrorMessage` -> `message`, etc.
+  - `SqlEventStoreConfig`: all `sqlEventStoreConfig*` prefixes removed
+  - Examples: lens-prefixed fields (`_accountBalance`, etc.) replaced with plain names
+
 - **StreamEvent** now carries `EventMetadata` (event type, correlation/causation IDs, timestamp):
   `StreamEvent key position metadata event` (was 3 fields, now 4).
 
 - **CommandHandler** gained an explicit error type parameter:
   `CommandHandler state event command err`.
-  - `commandHandlerHandler` renamed to `commandHandlerDecide`.
+  - `commandHandlerHandler` renamed to `decide`.
   - Returns `Either err [event]` instead of `[event]`.
   - `applyCommandHandler` returns `Either (CommandHandlerError err) [event]`
     where `CommandHandlerError` distinguishes `CommandRejected err` from
     `ConcurrencyConflict`.
 
 - **ProcessManager** is now pure:
-  - `processManagerReact :: state -> VersionedStreamEvent event -> [ProcessManagerEffect event command]`
+  - `react :: state -> VersionedStreamEvent event -> [ProcessManagerEffect event command]`
   - Effects are data: `IssueCommand UUID command`.
   - `runProcessManagerEffects` executes them.
   - Removed `ProcessManagerCommand`, pending-command/pending-event state fields.
@@ -41,8 +57,13 @@ Major refactoring of the core API.
 
 - Removed `Eventium.ReadModel.Memory` module.
 
+- **Examples**: removed `lens` dependency from bank example; replaced lens
+  operations with `OverloadedRecordDot` and record update syntax.
+
 ### Additions
 
+- `NoFieldSelectors`, `DuplicateRecordFields`, and `OverloadedRecordDot` enabled
+  as default extensions across all packages.
 - `EventMetadata` type with `emptyMetadata` helper.
 - `lenientCodecEventStoreReader` and `lenientCodecProjection` for
   graceful handling of unknown event types.

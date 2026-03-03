@@ -116,7 +116,7 @@ PostgreSQL tests require a running instance (`docker compose up -d`). See [CLAUD
 
 ## Documentation
 
-- [Architecture](./docs/architecute.md) -- Architecture and design decisions
+- [Architecture](./docs/architecture.md) -- Architecture and design decisions
 - [Changelog](CHANGELOG.md) -- Version history
 - [Examples](examples/) -- Working applications
 
