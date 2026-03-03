@@ -6,7 +6,7 @@ module Bank.Models.Customer.Commands
   )
 where
 
-import Bank.Json
+import Data.Aeson.TH
 import Language.Haskell.TH (Name)
 
 customerCommands :: [Name]
@@ -16,8 +16,8 @@ customerCommands =
 
 newtype CreateCustomer
   = CreateCustomer
-  { createCustomerData :: String
+  { name :: String
   }
   deriving (Show, Eq)
 
-deriveJSONUnPrefixLower ''CreateCustomer
+deriveJSON defaultOptions ''CreateCustomer

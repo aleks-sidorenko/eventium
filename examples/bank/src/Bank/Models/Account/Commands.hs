@@ -12,7 +12,7 @@ module Bank.Models.Account.Commands
   )
 where
 
-import Bank.Json
+import Data.Aeson.TH
 import Eventium.UUID
 import Language.Haskell.TH (Name)
 
@@ -29,58 +29,58 @@ accountCommands =
 
 data OpenAccount
   = OpenAccount
-  { openAccountOwner :: UUID,
-    openAccountInitialFunding :: Double
+  { owner :: UUID,
+    initialFunding :: Double
   }
   deriving (Show, Eq)
 
 data CreditAccount
   = CreditAccount
-  { creditAccountAmount :: Double,
-    creditAccountReason :: String
+  { amount :: Double,
+    reason :: String
   }
   deriving (Show, Eq)
 
 data DebitAccount
   = DebitAccount
-  { debitAccountAmount :: Double,
-    debitAccountReason :: String
+  { amount :: Double,
+    reason :: String
   }
   deriving (Show, Eq)
 
 data TransferToAccount
   = TransferToAccount
-  { transferToAccountTransferId :: UUID,
-    transferToAccountAmount :: Double,
-    transferToAccountTargetAccount :: UUID
+  { transferId :: UUID,
+    amount :: Double,
+    targetAccount :: UUID
   }
   deriving (Show, Eq)
 
 data AcceptTransfer
   = AcceptTransfer
-  { acceptTransferTransferId :: UUID,
-    acceptTransferSourceAccount :: UUID,
-    acceptTransferAmount :: Double
+  { transferId :: UUID,
+    sourceAccount :: UUID,
+    amount :: Double
   }
   deriving (Show, Eq)
 
 newtype CompleteTransfer
   = CompleteTransfer
-  { completeTransferTransferId :: UUID
+  { transferId :: UUID
   }
   deriving (Show, Eq)
 
 data RejectTransfer
   = RejectTransfer
-  { rejectTransferTransferId :: UUID,
-    rejectTransferReason :: String
+  { transferId :: UUID,
+    reason :: String
   }
   deriving (Show, Eq)
 
-deriveJSONUnPrefixLower ''OpenAccount
-deriveJSONUnPrefixLower ''CreditAccount
-deriveJSONUnPrefixLower ''DebitAccount
-deriveJSONUnPrefixLower ''TransferToAccount
-deriveJSONUnPrefixLower ''AcceptTransfer
-deriveJSONUnPrefixLower ''CompleteTransfer
-deriveJSONUnPrefixLower ''RejectTransfer
+deriveJSON defaultOptions ''OpenAccount
+deriveJSON defaultOptions ''CreditAccount
+deriveJSON defaultOptions ''DebitAccount
+deriveJSON defaultOptions ''TransferToAccount
+deriveJSON defaultOptions ''AcceptTransfer
+deriveJSON defaultOptions ''CompleteTransfer
+deriveJSON defaultOptions ''RejectTransfer

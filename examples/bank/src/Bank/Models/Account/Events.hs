@@ -12,7 +12,7 @@ module Bank.Models.Account.Events
   )
 where
 
-import Bank.Json
+import Data.Aeson.TH
 import Eventium (UUID)
 import Language.Haskell.TH (Name)
 
@@ -29,58 +29,58 @@ accountEvents =
 
 data AccountOpened
   = AccountOpened
-  { accountOpenedOwner :: UUID,
-    accountOpenedInitialFunding :: Double
+  { owner :: UUID,
+    initialFunding :: Double
   }
   deriving (Show, Eq)
 
 data AccountCredited
   = AccountCredited
-  { accountCreditedAmount :: Double,
-    accountCreditedReason :: String
+  { amount :: Double,
+    reason :: String
   }
   deriving (Show, Eq)
 
 data AccountDebited
   = AccountDebited
-  { accountDebitedAmount :: Double,
-    accountDebitedReason :: String
+  { amount :: Double,
+    reason :: String
   }
   deriving (Show, Eq)
 
 data AccountTransferStarted
   = AccountTransferStarted
-  { accountTransferStartedTransferId :: UUID,
-    accountTransferStartedAmount :: Double,
-    accountTransferStartedTargetAccount :: UUID
+  { transferId :: UUID,
+    amount :: Double,
+    targetAccount :: UUID
   }
   deriving (Show, Eq)
 
 newtype AccountTransferCompleted
   = AccountTransferCompleted
-  { accountTransferCompletedTransferId :: UUID
+  { transferId :: UUID
   }
   deriving (Show, Eq)
 
 data AccountTransferFailed
   = AccountTransferFailed
-  { accountTransferFailedTransferId :: UUID,
-    accountTransferFailedReason :: String
+  { transferId :: UUID,
+    reason :: String
   }
   deriving (Show, Eq)
 
 data AccountCreditedFromTransfer
   = AccountCreditedFromTransfer
-  { accountCreditedFromTransferTransferId :: UUID,
-    accountCreditedFromTransferSourceAccount :: UUID,
-    accountCreditedFromTransferAmount :: Double
+  { transferId :: UUID,
+    sourceAccount :: UUID,
+    amount :: Double
   }
   deriving (Show, Eq)
 
-deriveJSONUnPrefixLower ''AccountOpened
-deriveJSONUnPrefixLower ''AccountCredited
-deriveJSONUnPrefixLower ''AccountDebited
-deriveJSONUnPrefixLower ''AccountTransferStarted
-deriveJSONUnPrefixLower ''AccountTransferCompleted
-deriveJSONUnPrefixLower ''AccountTransferFailed
-deriveJSONUnPrefixLower ''AccountCreditedFromTransfer
+deriveJSON defaultOptions ''AccountOpened
+deriveJSON defaultOptions ''AccountCredited
+deriveJSON defaultOptions ''AccountDebited
+deriveJSON defaultOptions ''AccountTransferStarted
+deriveJSON defaultOptions ''AccountTransferCompleted
+deriveJSON defaultOptions ''AccountTransferFailed
+deriveJSON defaultOptions ''AccountCreditedFromTransfer

@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Bank.Models.Account.CommandHandler
@@ -11,7 +10,6 @@ where
 import Bank.Models.Account.Commands
 import Bank.Models.Account.Events
 import Bank.Models.Account.Projection
-import Control.Lens
 import Data.Maybe (isNothing)
 import Eventium
 import SumTypesX.TH
@@ -27,75 +25,75 @@ data AccountCommandError
   deriving (Show, Eq)
 
 handleAccountCommand :: Account -> AccountCommand -> Either AccountCommandError [AccountEvent]
-handleAccountCommand account (OpenAccountAccountCommand OpenAccount {..}) =
-  case account ^. accountOwner of
+handleAccountCommand account (OpenAccountAccountCommand cmd) =
+  case account.owner of
     Just _ -> Left AccountAlreadyOpen
     Nothing ->
-      if openAccountInitialFunding < 0
+      if cmd.initialFunding < 0
         then Left InvalidInitialDeposit
         else
           Right
             [ AccountOpenedAccountEvent
                 AccountOpened
-                  { accountOpenedOwner = openAccountOwner,
-                    accountOpenedInitialFunding = openAccountInitialFunding
+                  { owner = cmd.owner,
+                    initialFunding = cmd.initialFunding
                   }
             ]
-handleAccountCommand _ (CreditAccountAccountCommand CreditAccount {..}) =
+handleAccountCommand _ (CreditAccountAccountCommand cmd) =
   Right
     [ AccountCreditedAccountEvent
         AccountCredited
-          { accountCreditedAmount = creditAccountAmount,
-            accountCreditedReason = creditAccountReason
+          { amount = cmd.amount,
+            reason = cmd.reason
           }
     ]
-handleAccountCommand account (DebitAccountAccountCommand DebitAccount {..}) =
-  if accountAvailableBalance account - debitAccountAmount < 0
+handleAccountCommand account (DebitAccountAccountCommand cmd) =
+  if accountAvailableBalance account - cmd.amount < 0
     then Left $ InsufficientFunds $ accountAvailableBalance account
     else
       Right
         [ AccountDebitedAccountEvent
             AccountDebited
-              { accountDebitedAmount = debitAccountAmount,
-                accountDebitedReason = debitAccountReason
+              { amount = cmd.amount,
+                reason = cmd.reason
               }
         ]
-handleAccountCommand account (TransferToAccountAccountCommand TransferToAccount {..})
-  | isNothing (account ^. accountOwner) =
+handleAccountCommand account (TransferToAccountAccountCommand cmd)
+  | isNothing account.owner =
       Left AccountNotOpen
-  | accountAvailableBalance account - transferToAccountAmount < 0 =
+  | accountAvailableBalance account - cmd.amount < 0 =
       Left $ InsufficientFunds $ accountAvailableBalance account
   | otherwise =
       Right
         [ AccountTransferStartedAccountEvent
             AccountTransferStarted
-              { accountTransferStartedTransferId = transferToAccountTransferId,
-                accountTransferStartedAmount = transferToAccountAmount,
-                accountTransferStartedTargetAccount = transferToAccountTargetAccount
+              { transferId = cmd.transferId,
+                amount = cmd.amount,
+                targetAccount = cmd.targetAccount
               }
         ]
-handleAccountCommand _ (AcceptTransferAccountCommand AcceptTransfer {..}) =
+handleAccountCommand _ (AcceptTransferAccountCommand cmd) =
   Right
     [ AccountCreditedFromTransferAccountEvent
         AccountCreditedFromTransfer
-          { accountCreditedFromTransferTransferId = acceptTransferTransferId,
-            accountCreditedFromTransferSourceAccount = acceptTransferSourceAccount,
-            accountCreditedFromTransferAmount = acceptTransferAmount
+          { transferId = cmd.transferId,
+            sourceAccount = cmd.sourceAccount,
+            amount = cmd.amount
           }
     ]
-handleAccountCommand _ (CompleteTransferAccountCommand CompleteTransfer {..}) =
+handleAccountCommand _ (CompleteTransferAccountCommand cmd) =
   Right
     [ AccountTransferCompletedAccountEvent
         AccountTransferCompleted
-          { accountTransferCompletedTransferId = completeTransferTransferId
+          { transferId = cmd.transferId
           }
     ]
-handleAccountCommand _ (RejectTransferAccountCommand RejectTransfer {..}) =
+handleAccountCommand _ (RejectTransferAccountCommand cmd) =
   Right
     [ AccountTransferFailedAccountEvent
         AccountTransferFailed
-          { accountTransferFailedTransferId = rejectTransferTransferId,
-            accountTransferFailedReason = rejectTransferReason
+          { transferId = cmd.transferId,
+            reason = cmd.reason
           }
     ]
 

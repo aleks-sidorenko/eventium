@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Bank.CLI
   ( bankCLIMain,
   )
@@ -14,9 +12,9 @@ import Eventium.Store.Sqlite
 
 bankCLIMain :: IO ()
 bankCLIMain = do
-  Options {..} <- runOptionsParser
+  opts <- runOptionsParser
 
   -- Set up DB connection
-  runNoLoggingT $ withSqlitePool (pack optionsDatabaseFile) 1 $ \pool -> NoLoggingT $ do
+  runNoLoggingT $ withSqlitePool (pack opts.databaseFile) 1 $ \pool -> NoLoggingT $ do
     initializeSqliteEventStore defaultSqlEventStoreConfig pool
-    runCLICommand pool optionsCommand
+    runCLICommand pool opts.command
