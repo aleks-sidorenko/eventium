@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -32,20 +31,20 @@ import Eventium.UUID
 
 data SqlEventStoreConfig entity serialized
   = SqlEventStoreConfig
-  { sqlEventStoreConfigSequenceMakeEntity :: UUID -> EventVersion -> serialized -> Maybe JSONString -> entity,
+  { sequenceMakeEntity :: UUID -> EventVersion -> serialized -> Maybe JSONString -> entity,
     -- Key manipulation
-    sqlEventStoreConfigMakeKey :: SequenceNumber -> Key entity,
-    sqlEventStoreConfigUnKey :: Key entity -> SequenceNumber,
+    makeKey :: SequenceNumber -> Key entity,
+    unKey :: Key entity -> SequenceNumber,
     -- Record functions
-    sqlEventStoreConfigUUID :: entity -> UUID,
-    sqlEventStoreConfigVersion :: entity -> EventVersion,
-    sqlEventStoreConfigData :: entity -> serialized,
-    sqlEventStoreConfigMetadata :: entity -> Maybe JSONString,
+    uuid :: entity -> UUID,
+    version :: entity -> EventVersion,
+    eventData :: entity -> serialized,
+    eventMetadata :: entity -> Maybe JSONString,
     -- EntityFields
-    sqlEventStoreConfigSequenceNumberField :: EntityField entity (Key entity),
-    sqlEventStoreConfigUUIDField :: EntityField entity UUID,
-    sqlEventStoreConfigVersionField :: EntityField entity EventVersion,
-    sqlEventStoreConfigDataField :: EntityField entity serialized
+    sequenceNumberField :: EntityField entity (Key entity),
+    uuidField :: EntityField entity UUID,
+    versionField :: EntityField entity EventVersion,
+    dataField :: EntityField entity serialized
   }
 
 sqlEventStoreReader ::
@@ -65,9 +64,9 @@ sqlEventToGlobalStream ::
   SqlEventStoreConfig entity serialized ->
   Entity entity ->
   GlobalStreamEvent serialized
-sqlEventToGlobalStream config@SqlEventStoreConfig {..} (Entity key event) =
+sqlEventToGlobalStream config (Entity entityKey event) =
   let versioned = sqlEventToVersioned config event
-   in StreamEvent () (sqlEventStoreConfigUnKey key) (streamEventMetadata versioned) versioned
+   in StreamEvent () (config.unKey entityKey) versioned.metadata versioned
 
 -- | Decode metadata from a stored JSONString. Returns empty metadata on NULL
 -- or decode failure, ensuring events are always readable.
@@ -78,64 +77,64 @@ sqlEventToVersioned ::
   SqlEventStoreConfig entity serialized ->
   entity ->
   VersionedStreamEvent serialized
-sqlEventToVersioned SqlEventStoreConfig {..} entity =
+sqlEventToVersioned config entity =
   StreamEvent
-    (sqlEventStoreConfigUUID entity)
-    (sqlEventStoreConfigVersion entity)
-    (decodeMetadata $ sqlEventStoreConfigMetadata entity)
-    (sqlEventStoreConfigData entity)
+    (config.uuid entity)
+    (config.version entity)
+    (decodeMetadata $ config.eventMetadata entity)
+    (config.eventData entity)
 
 sqlGetProjectionIds ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
   SqlEventStoreConfig entity serialized ->
   SqlPersistT m [UUID]
-sqlGetProjectionIds SqlEventStoreConfig {..} =
+sqlGetProjectionIds config =
   fmap unSingle <$> rawSql ("SELECT DISTINCT " <> uuidFieldName <> " FROM " <> tableName) []
   where
-    tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity nil 0 undefined Nothing)
-    uuidFieldName = unFieldNameDB $ fieldDBName sqlEventStoreConfigUUIDField
+    tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
+    uuidFieldName = unFieldNameDB $ fieldDBName config.uuidField
 
 sqlGetStreamEvents ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
   SqlEventStoreConfig entity serialized ->
   QueryRange UUID EventVersion ->
   SqlPersistT m [VersionedStreamEvent serialized]
-sqlGetStreamEvents config@SqlEventStoreConfig {..} QueryRange {..} = do
+sqlGetStreamEvents config query = do
   entities <- selectList filters selectOpts
   return $ sqlEventToVersioned config . entityVal <$> entities
   where
     startFilter =
-      case queryRangeStart of
+      case query.start of
         StartFromBeginning -> []
-        StartQueryAt start -> [sqlEventStoreConfigVersionField >=. start]
+        StartQueryAt s -> [config.versionField >=. s]
     (endFilter, endSelectOpt) =
-      case queryRangeLimit of
+      case query.limit of
         NoQueryLimit -> ([], [])
         MaxNumberOfEvents maxNum -> ([], [LimitTo maxNum])
-        StopQueryAt stop -> ([sqlEventStoreConfigVersionField <=. stop], [])
-    filters = (sqlEventStoreConfigUUIDField ==. queryRangeKey) : startFilter ++ endFilter
-    selectOpts = Asc sqlEventStoreConfigSequenceNumberField : endSelectOpt
+        StopQueryAt stop -> ([config.versionField <=. stop], [])
+    filters = (config.uuidField ==. query.key) : startFilter ++ endFilter
+    selectOpts = Asc config.sequenceNumberField : endSelectOpt
 
 sqlGetAllEventsInRange ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
   SqlEventStoreConfig entity serialized ->
   QueryRange () SequenceNumber ->
   SqlPersistT m [GlobalStreamEvent serialized]
-sqlGetAllEventsInRange config@SqlEventStoreConfig {..} QueryRange {..} = do
+sqlGetAllEventsInRange config query = do
   entities <- selectList filters selectOpts
   return $ sqlEventToGlobalStream config <$> entities
   where
     startFilter =
-      case queryRangeStart of
+      case query.start of
         StartFromBeginning -> []
-        StartQueryAt start -> [sqlEventStoreConfigSequenceNumberField >=. sqlEventStoreConfigMakeKey start]
+        StartQueryAt s -> [config.sequenceNumberField >=. config.makeKey s]
     (endFilter, endSelectOpt) =
-      case queryRangeLimit of
+      case query.limit of
         NoQueryLimit -> ([], [])
         MaxNumberOfEvents maxNum -> ([], [LimitTo maxNum])
-        StopQueryAt stop -> ([sqlEventStoreConfigSequenceNumberField <=. sqlEventStoreConfigMakeKey stop], [])
+        StopQueryAt stop -> ([config.sequenceNumberField <=. config.makeKey stop], [])
     filters = startFilter ++ endFilter
-    selectOpts = Asc sqlEventStoreConfigSequenceNumberField : endSelectOpt
+    selectOpts = Asc config.sequenceNumberField : endSelectOpt
 
 sqlMaxEventVersion ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
@@ -143,11 +142,11 @@ sqlMaxEventVersion ::
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->
   SqlPersistT m EventVersion
-sqlMaxEventVersion SqlEventStoreConfig {..} maxVersionSql uuid =
-  let tableName = FieldNameDB $ unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity nil 0 undefined Nothing)
-      uuidFieldName = fieldDBName sqlEventStoreConfigUUIDField
-      versionFieldName = fieldDBName sqlEventStoreConfigVersionField
-      rawVals = rawSql (maxVersionSql tableName uuidFieldName versionFieldName) [toPersistValue uuid]
+sqlMaxEventVersion config maxVersionSql uid =
+  let tableName = FieldNameDB $ unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
+      uuidFieldName = fieldDBName config.uuidField
+      versionFieldName = fieldDBName config.versionField
+      rawVals = rawSql (maxVersionSql tableName uuidFieldName versionFieldName) [toPersistValue uid]
    in maybe 0 unSingle . listToMaybe <$> rawVals
 
 sqlStoreEvents ::
@@ -158,16 +157,16 @@ sqlStoreEvents ::
   UUID ->
   [serialized] ->
   SqlPersistT m EventVersion
-sqlStoreEvents config@SqlEventStoreConfig {..} mLockCommand maxVersionSql uuid events = do
-  versionNum <- sqlMaxEventVersion config maxVersionSql uuid
-  let entities = zipWith (\v e -> sqlEventStoreConfigSequenceMakeEntity uuid v e Nothing) [versionNum + 1 ..] events
+sqlStoreEvents config mLockCommand maxVersionSql uid events = do
+  versionNum <- sqlMaxEventVersion config maxVersionSql uid
+  let entities = zipWith (\v e -> config.sequenceMakeEntity uid v e Nothing) [versionNum + 1 ..] events
   -- NB: We need to take a lock on the events table or else the global sequence
   -- numbers may not increase monotonically over time.
   for_ mLockCommand $ \lockCommand -> rawExecute (lockCommand tableName) []
   _ <- insertMany entities
   return $ versionNum + EventVersion (length events)
   where
-    tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity nil 0 undefined Nothing)
+    tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
 
 -- | Like 'sqlStoreEvents' but accepts 'TaggedEvent's, using their metadata
 -- for event type name, correlation ID, causation ID, and timestamp.
@@ -179,13 +178,13 @@ sqlStoreEventsTagged ::
   UUID ->
   [TaggedEvent serialized] ->
   SqlPersistT m EventVersion
-sqlStoreEventsTagged config@SqlEventStoreConfig {..} mLockCommand maxVersionSql uuid taggedEvents = do
-  versionNum <- sqlMaxEventVersion config maxVersionSql uuid
+sqlStoreEventsTagged config mLockCommand maxVersionSql uid taggedEvents = do
+  versionNum <- sqlMaxEventVersion config maxVersionSql uid
   let entities =
         zipWith
           ( \v (TaggedEvent meta e) ->
-              sqlEventStoreConfigSequenceMakeEntity
-                uuid
+              config.sequenceMakeEntity
+                uid
                 v
                 e
                 (Just $ encodeJSON meta)
@@ -196,7 +195,7 @@ sqlStoreEventsTagged config@SqlEventStoreConfig {..} mLockCommand maxVersionSql 
   _ <- insertMany entities
   return $ versionNum + EventVersion (length taggedEvents)
   where
-    tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity nil 0 undefined Nothing)
+    tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
 
 -- | Useful if you have some 'GlobalStreamEvent's and you want to shove them in
 -- a SQL event store. This can happen when you are moving events between event
@@ -207,15 +206,15 @@ unsafeSqlStoreGlobalStreamEvents ::
   SqlEventStoreConfig entity serialized ->
   [GlobalStreamEvent serialized] ->
   SqlPersistT m ()
-unsafeSqlStoreGlobalStreamEvents SqlEventStoreConfig {..} events =
+unsafeSqlStoreGlobalStreamEvents config events =
   insertEntityMany $ fmap mkEventEntity events
   where
-    mkEventEntity (StreamEvent () seqNum _ (StreamEvent uuid vers meta payload)) =
+    mkEventEntity (StreamEvent () seqNum _ (StreamEvent uid vers meta evtPayload)) =
       Entity
-        (sqlEventStoreConfigMakeKey seqNum)
-        ( sqlEventStoreConfigSequenceMakeEntity
-            uuid
+        (config.makeKey seqNum)
+        ( config.sequenceMakeEntity
+            uid
             vers
-            payload
+            evtPayload
             (Just $ encodeJSON meta)
         )

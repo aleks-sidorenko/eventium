@@ -43,8 +43,8 @@ SqlEvent sql=events
 |]
 
 sqlEventMakeKey :: SequenceNumber -> Key SqlEvent
-sqlEventMakeKey sequenceNumber =
-  toSqlKey (fromIntegral (unSequenceNumber sequenceNumber))
+sqlEventMakeKey (SequenceNumber n) =
+  toSqlKey (fromIntegral n)
 
 sqlEventUnKey :: Key SqlEvent -> SequenceNumber
 sqlEventUnKey key =
@@ -53,15 +53,15 @@ sqlEventUnKey key =
 defaultSqlEventStoreConfig :: SqlEventStoreConfig SqlEvent JSONString
 defaultSqlEventStoreConfig =
   SqlEventStoreConfig
-    { sqlEventStoreConfigSequenceMakeEntity = SqlEvent,
-      sqlEventStoreConfigMakeKey = sqlEventMakeKey,
-      sqlEventStoreConfigUnKey = sqlEventUnKey,
-      sqlEventStoreConfigUUID = sqlEventUuid,
-      sqlEventStoreConfigVersion = sqlEventVersion,
-      sqlEventStoreConfigData = sqlEventPayload,
-      sqlEventStoreConfigMetadata = sqlEventMetadata,
-      sqlEventStoreConfigSequenceNumberField = SqlEventId,
-      sqlEventStoreConfigUUIDField = SqlEventUuid,
-      sqlEventStoreConfigVersionField = SqlEventVersion,
-      sqlEventStoreConfigDataField = SqlEventPayload
+    { sequenceMakeEntity = SqlEvent,
+      makeKey = sqlEventMakeKey,
+      unKey = sqlEventUnKey,
+      uuid = \(SqlEvent u _ _ _) -> u,
+      version = \(SqlEvent _ v _ _) -> v,
+      eventData = \(SqlEvent _ _ p _) -> p,
+      eventMetadata = \(SqlEvent _ _ _ m) -> m,
+      sequenceNumberField = SqlEventId,
+      uuidField = SqlEventUuid,
+      versionField = SqlEventVersion,
+      dataField = SqlEventPayload
     }

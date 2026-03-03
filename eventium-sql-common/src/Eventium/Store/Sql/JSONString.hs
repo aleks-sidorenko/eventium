@@ -24,7 +24,7 @@ instance PersistFieldSql JSONString where
   sqlType _ = SqlOther "jsonb"
 
 instance Show JSONString where
-  show = show . unJSONString
+  show (JSONString t) = show t
 
 jsonStringCodec :: (Aeson.ToJSON a, Aeson.FromJSON a) => Codec a JSONString
 jsonStringCodec =
@@ -36,4 +36,4 @@ encodeJSON :: (Aeson.ToJSON a) => a -> JSONString
 encodeJSON = JSONString . TLE.decodeUtf8 . Aeson.encode
 
 decodeJSON :: (Aeson.FromJSON a) => JSONString -> Maybe a
-decodeJSON = Aeson.decode . TLE.encodeUtf8 . unJSONString
+decodeJSON (JSONString t) = Aeson.decode . TLE.encodeUtf8 $ t
