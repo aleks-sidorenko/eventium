@@ -25,7 +25,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException, throwIO, try)
 import Control.Monad (forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Foldable (foldl')
 import qualified Data.List.NonEmpty as NE
 import Eventium.EventHandler
 import Eventium.Projection

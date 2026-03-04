@@ -7,7 +7,6 @@ module Bank.CLI.Options
 where
 
 import Bank.Models
-import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Eventium
 import Options.Applicative

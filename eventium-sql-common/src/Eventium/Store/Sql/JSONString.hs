@@ -17,7 +17,7 @@ import Database.Persist.Sql
 import Eventium.Codec (Codec (..))
 
 -- | A more specific type than just ByteString for JSON data.
-newtype JSONString = JSONString {unJSONString :: Text}
+newtype JSONString = JSONString Text
   deriving (Eq, PersistField)
 
 instance PersistFieldSql JSONString where

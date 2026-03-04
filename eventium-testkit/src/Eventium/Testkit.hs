@@ -32,7 +32,6 @@ import Control.Monad.IO.Class as X
 import Control.Monad.Logger as X
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Foldable (foldl')
 import Data.List (scanl')
 import Data.Text (Text)
 import Eventium
@@ -55,13 +54,19 @@ counterProjection :: CounterProjection
 counterProjection =
   Projection
     (Counter 0)
-    (\(Counter k) (Added x) -> Counter (k + x))
+    ( \(Counter k) event -> case event of
+        Added x -> Counter (k + x)
+        CounterFailedOutOfBounds -> Counter k
+    )
 
 counterGlobalProjection :: Projection Counter (VersionedStreamEvent CounterEvent)
 counterGlobalProjection =
   Projection
     (Counter 0)
-    (\(Counter k) (StreamEvent _ _ _ (Added x)) -> Counter (k + x))
+    ( \(Counter k) streamEvent -> case streamEvent.payload of
+        Added x -> Counter (k + x)
+        CounterFailedOutOfBounds -> Counter k
+    )
 
 data CounterCommand
   = Increment

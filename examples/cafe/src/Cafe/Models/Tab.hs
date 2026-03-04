@@ -21,7 +21,6 @@ where
 
 import Data.Aeson
 import Data.Aeson.TH
-import Data.List (foldl')
 import Data.Maybe (catMaybes, isJust)
 import Eventium
 
