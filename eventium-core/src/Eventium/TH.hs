@@ -4,4 +4,5 @@ module Eventium.TH
 where
 
 import Eventium.TH.Projection as X
+import Eventium.TH.SumType as X
 import Eventium.TH.SumTypeCodec as X
