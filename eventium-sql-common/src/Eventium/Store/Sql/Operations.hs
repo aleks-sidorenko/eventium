@@ -38,13 +38,14 @@ data SqlEventStoreConfig entity serialized
     -- Record functions
     uuid :: entity -> UUID,
     version :: entity -> EventVersion,
-    eventData :: entity -> serialized,
-    eventMetadata :: entity -> Maybe JSONString,
+    payload :: entity -> serialized,
+    metadata :: entity -> Maybe JSONString,
     -- EntityFields
     sequenceNumberField :: EntityField entity (Key entity),
     uuidField :: EntityField entity UUID,
     versionField :: EntityField entity EventVersion,
-    dataField :: EntityField entity serialized
+    payloadField :: EntityField entity serialized,
+    metadataField :: EntityField entity (Maybe JSONString)
   }
 
 sqlEventStoreReader ::
@@ -81,8 +82,8 @@ sqlEventToVersioned config entity =
   StreamEvent
     (config.uuid entity)
     (config.version entity)
-    (decodeMetadata $ config.eventMetadata entity)
-    (config.eventData entity)
+    (decodeMetadata $ config.metadata entity)
+    (config.payload entity)
 
 sqlGetProjectionIds ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>

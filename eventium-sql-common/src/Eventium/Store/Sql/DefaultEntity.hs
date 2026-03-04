@@ -58,10 +58,11 @@ defaultSqlEventStoreConfig =
       unKey = sqlEventUnKey,
       uuid = \(SqlEvent u _ _ _) -> u,
       version = \(SqlEvent _ v _ _) -> v,
-      eventData = \(SqlEvent _ _ p _) -> p,
-      eventMetadata = \(SqlEvent _ _ _ m) -> m,
+      payload = \(SqlEvent _ _ p _) -> p,
+      metadata = \(SqlEvent _ _ _ m) -> m,
       sequenceNumberField = SqlEventId,
       uuidField = SqlEventUuid,
       versionField = SqlEventVersion,
-      dataField = SqlEventPayload
+      payloadField = SqlEventPayload,
+      metadataField = SqlEventMetadata
     }
