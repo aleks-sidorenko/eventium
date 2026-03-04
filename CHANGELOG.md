@@ -60,6 +60,13 @@ Major refactoring of the core API.
 - **Examples**: removed `lens` dependency from bank example; replaced lens
   operations with `OverloadedRecordDot` and record update syntax.
 
+### Internal
+
+- **GHC upgraded from 9.6.7 to 9.10.3** (Stackage LTS 24.32).
+- Absorbed `x-sum-type-boilerplate` into `Eventium.TH.SumType` (upstream
+  incompatible with GHC 9.10).
+- Dropped `persistent-template` dependency (merged into `persistent` since 2.12.0.1).
+
 ### Additions
 
 - `NoFieldSelectors`, `DuplicateRecordFields`, and `OverloadedRecordDot` enabled
@@ -88,4 +95,4 @@ Major refactoring of the core API.
 
 ## 0.1.0
 
-Initial Hackage release of `eventium`. Fork of `eventful`, Nix-ified and updated for GHC 9.6.7.
+Initial Hackage release of `eventium`. Fork of `eventful`, Nix-ified and updated for GHC 9.6.

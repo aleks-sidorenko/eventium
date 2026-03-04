@@ -4,7 +4,7 @@ A Haskell library for building event-sourced applications with CQRS.
 
 ## Overview
 
-Eventium provides composable, type-safe abstractions for event sourcing: event stores with optimistic concurrency, pure projections, command handlers, process managers, event subscriptions, and pluggable storage backends. It is a modernized fork of `eventful`, updated for GHC 9.6.
+Eventium provides composable, type-safe abstractions for event sourcing: event stores with optimistic concurrency, pure projections, command handlers, process managers, event subscriptions, and pluggable storage backends. It is a modernized fork of `eventful`, updated for GHC 9.10.
 
 ## Packages
 
@@ -102,7 +102,7 @@ cabal run bank-main -- --help
 
 ## Build System
 
-Nix + Cabal with GHC 9.6.7. Cabal files are generated from `package.yaml` via hpack.
+Nix + Cabal with GHC 9.10.3. Cabal files are generated from `package.yaml` via hpack.
 
 ```bash
 just build          # cabal build all
