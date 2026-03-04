@@ -15,3 +15,6 @@ tags
 
 # Claude
 .claude/
+
+# Worktrees
+.worktrees/
