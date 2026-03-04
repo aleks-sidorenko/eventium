@@ -12,10 +12,8 @@ module Eventium.Store.Postgresql
 where
 
 import Control.Monad.Reader
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import Database.Persist
-import Database.Persist.Names (EntityNameDB (..), FieldNameDB (..))
 import Database.Persist.Sql
 import Eventium.Store.Class
 import Eventium.Store.Sql

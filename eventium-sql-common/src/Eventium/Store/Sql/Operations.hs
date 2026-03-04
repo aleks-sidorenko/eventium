@@ -21,8 +21,6 @@ import Data.Foldable (for_)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import Database.Persist
-import Database.Persist.Class (SafeToInsert)
-import Database.Persist.Names (EntityNameDB (..), FieldNameDB (..))
 import Database.Persist.Sql
 import Eventium.Store.Class
 import Eventium.Store.Sql.JSONString (JSONString, decodeJSON, encodeJSON)
@@ -65,9 +63,9 @@ sqlEventToGlobalStream ::
   SqlEventStoreConfig entity serialized ->
   Entity entity ->
   GlobalStreamEvent serialized
-sqlEventToGlobalStream config (Entity entityKey event) =
+sqlEventToGlobalStream config (Entity eKey event) =
   let versioned = sqlEventToVersioned config event
-   in StreamEvent () (config.unKey entityKey) versioned.metadata versioned
+   in StreamEvent () (config.unKey eKey) versioned.metadata versioned
 
 -- | Decode metadata from a stored JSONString. Returns empty metadata on NULL
 -- or decode failure, ensuring events are always readable.

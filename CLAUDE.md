@@ -8,7 +8,7 @@ Eventium is a Haskell event sourcing library (forked and modernized from `eventf
 
 ## Build & Development
 
-**Prerequisites:** Nix (with flakes) + direnv. Entering the directory auto-loads the dev environment via `.envrc` → `nix develop`. GHC 9.6.7 is pinned.
+**Prerequisites:** Nix (with flakes) + direnv. Entering the directory auto-loads the dev environment via `.envrc` → `nix develop`. GHC 9.10.3 is pinned.
 
 **Cabal files are generated from `package.yaml` via hpack.** After changing any `package.yaml`, run `just hpack` before building.
 
@@ -54,7 +54,7 @@ Multi-package cabal project (`cabal.project`):
   - `ProcessManager`, `EventSubscription`, `EventPublisher` — orchestration primitives
   - `Codec` — bidirectional event encoding/decoding (encode/decode)
   - `TypeEmbedding` — sum-type subset relationships (embed/extract)
-  - `Eventium.TH` — Template Haskell codegen for projections, sum-type codecs, and embeddings (uses `x-sum-type-boilerplate`)
+  - `Eventium.TH` — Template Haskell codegen for projections, sum-type codecs, embeddings, and sum-type construction
 - **eventium-memory** — STM-based in-memory `EventStoreReader`/`Writer` and `ProjectionCache`. Primary backend for tests.
 - **eventium-sql-common** — Shared persistent entity definitions and SQL operations for SQL backends.
 - **eventium-postgresql** — PostgreSQL backend via `persistent`/`persistent-postgresql`.

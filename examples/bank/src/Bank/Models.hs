@@ -23,9 +23,8 @@ import Data.Aeson.TH
 import Data.Void (Void)
 import Eventium
 import Eventium.TH
-import SumTypesX.TH
 
-constructSumType "BankEvent" (defaultSumTypeOptions {sumTypeOptionsTagOptions = ConstructTagName (++ "Event")}) $
+constructSumType "BankEvent" (withTagOptions (ConstructTagName (++ "Event")) defaultSumTypeOptions) $
   accountEvents ++ customerEvents
 
 deriving instance Show BankEvent
@@ -34,7 +33,7 @@ deriving instance Eq BankEvent
 
 deriveJSON (defaultOptions {constructorTagModifier = dropSuffix "Event"}) ''BankEvent
 
-constructSumType "BankCommand" (defaultSumTypeOptions {sumTypeOptionsTagOptions = ConstructTagName (++ "Command")}) $
+constructSumType "BankCommand" (withTagOptions (ConstructTagName (++ "Command")) defaultSumTypeOptions) $
   accountCommands ++ customerCommands
 
 deriving instance Show BankCommand

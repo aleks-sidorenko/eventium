@@ -17,8 +17,15 @@ See the [root changelog](../CHANGELOG.md) for full details.
 - Codec wrapper argument order changed (codec comes first).
 - Removed `Eventium.ReadModel.Memory`.
 
+### Internal
+
+- Absorbed `x-sum-type-boilerplate` into `Eventium.TH.SumType`.
+- Dropped `persistent-template` dependency.
+
 ### Additions
 
+- `Eventium.TH.SumType` module: `constructSumType`, `sumTypeConverter`,
+  `partialSumTypeConverter` (previously from `x-sum-type-boilerplate`).
 - `NoFieldSelectors`, `DuplicateRecordFields`, `OverloadedRecordDot` default extensions.
 - `EventMetadata`, `emptyMetadata`.
 - `lenientCodecEventStoreReader`, `lenientCodecProjection`.

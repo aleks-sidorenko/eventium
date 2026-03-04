@@ -18,7 +18,6 @@ module Eventium.Projection
 where
 
 import Control.Exception (throw)
-import Data.Foldable (foldl')
 import Data.Functor.Contravariant
 import Data.List (scanl')
 import Eventium.Codec

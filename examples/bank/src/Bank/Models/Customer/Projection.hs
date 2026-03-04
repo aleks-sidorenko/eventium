@@ -11,7 +11,7 @@ where
 import Bank.Models.Customer.Events
 import Data.Aeson.TH
 import Eventium
-import SumTypesX.TH
+import Eventium.TH.SumType
 
 newtype Customer
   = Customer
@@ -21,14 +21,14 @@ newtype Customer
 
 deriveJSON defaultOptions ''Customer
 
-constructSumType "CustomerEvent" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) customerEvents
+constructSumType "CustomerEvent" (withTagOptions AppendTypeNameToTags defaultSumTypeOptions) customerEvents
 
 deriving instance Show CustomerEvent
 
 deriving instance Eq CustomerEvent
 
 handleCustomerEvent :: Customer -> CustomerEvent -> Customer
-handleCustomerEvent customer (CustomerCreatedCustomerEvent (CustomerCreated n)) = customer {name = Just n}
+handleCustomerEvent _customer (CustomerCreatedCustomerEvent (CustomerCreated n)) = Customer {name = Just n}
 handleCustomerEvent customer (CustomerCreationRejectedCustomerEvent _) = customer
 
 customerProjection :: Projection Customer CustomerEvent

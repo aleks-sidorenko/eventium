@@ -15,7 +15,7 @@ import Bank.Models.Account.Events
 import Data.Aeson.TH
 import Data.List (delete, find)
 import Eventium
-import SumTypesX.TH
+import Eventium.TH.SumType
 
 data Account
   = Account
@@ -49,7 +49,7 @@ accountAvailableBalance account = account.balance - pendingBalance
 findAccountTransferById :: [PendingAccountTransfer] -> UUID -> Maybe PendingAccountTransfer
 findAccountTransferById transfers transferId' = find (\t -> t.id == transferId') transfers
 
-constructSumType "AccountEvent" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) accountEvents
+constructSumType "AccountEvent" (withTagOptions AppendTypeNameToTags defaultSumTypeOptions) accountEvents
 
 deriving instance Show AccountEvent
 

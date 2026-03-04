@@ -10,7 +10,6 @@ where
 
 import Cafe.DB
 import Cafe.Models.Tab
-import Data.Monoid ((<>))
 import Database.Persist.Sql
 import Options.Applicative
 import Safe (atNote)

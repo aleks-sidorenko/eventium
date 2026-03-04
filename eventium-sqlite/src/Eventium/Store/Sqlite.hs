@@ -15,8 +15,6 @@ where
 import Control.Monad.Reader
 import Data.Text (Text)
 import Database.Persist
-import Database.Persist.Class (SafeToInsert)
-import Database.Persist.Names (EntityNameDB (..), FieldNameDB (..))
 import Database.Persist.Sql
 import Eventium.Store.Class
 import Eventium.Store.Sql

@@ -6,7 +6,6 @@ module Eventium.Store.Sql.Orphans
   )
 where
 
-import qualified Data.ByteString as BS
 import Data.Proxy
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -23,8 +22,6 @@ instance PersistField UUID where
       Just x -> Right x
       Nothing -> Left "Invalid UUID"
   fromPersistValue (PersistByteString bs) =
-    maybe (Left "Invalid UUID") Right (uuidFromText (TE.decodeUtf8 bs))
-  fromPersistValue (PersistDbSpecific bs) =
     maybe (Left "Invalid UUID") Right (uuidFromText (TE.decodeUtf8 bs))
   fromPersistValue (PersistLiteral_ _ bs) =
     maybe (Left "Invalid UUID") Right (uuidFromText (TE.decodeUtf8 bs))
