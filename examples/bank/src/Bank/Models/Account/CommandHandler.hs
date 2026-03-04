@@ -12,9 +12,9 @@ import Bank.Models.Account.Events
 import Bank.Models.Account.Projection
 import Data.Maybe (isNothing)
 import Eventium
-import SumTypesX.TH
+import Eventium.TH.SumType
 
-constructSumType "AccountCommand" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) accountCommands
+constructSumType "AccountCommand" (withTagOptions AppendTypeNameToTags defaultSumTypeOptions) accountCommands
 
 -- | Errors returned by the account command handler when a command is rejected.
 data AccountCommandError

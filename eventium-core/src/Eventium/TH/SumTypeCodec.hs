@@ -8,8 +8,8 @@ module Eventium.TH.SumTypeCodec
 where
 
 import Data.Char (toLower)
+import Eventium.TH.SumType
 import Language.Haskell.TH
-import SumTypesX.TH
 
 -- | This is a template haskell function that creates a 'Codec' between
 -- two sum types. The first sum type must be a subset of the second sum type.

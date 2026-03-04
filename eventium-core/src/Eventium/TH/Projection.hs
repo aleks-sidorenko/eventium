@@ -8,8 +8,8 @@ where
 
 import Data.Char (toLower)
 import Eventium.Projection
+import Eventium.TH.SumType
 import Language.Haskell.TH
-import SumTypesX.TH
 
 -- | Creates a 'Projection' for a given type and a list of events. The user of
 -- this function also needs to provide event handlers for each event. For

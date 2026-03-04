@@ -11,9 +11,9 @@ import Bank.Models.Customer.Events
 import Bank.Models.Customer.Projection
 import Data.Void (Void)
 import Eventium
-import SumTypesX.TH
+import Eventium.TH.SumType
 
-constructSumType "CustomerCommand" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) customerCommands
+constructSumType "CustomerCommand" (withTagOptions AppendTypeNameToTags defaultSumTypeOptions) customerCommands
 
 handleCustomerCommand :: Customer -> CustomerCommand -> Either Void [CustomerEvent]
 handleCustomerCommand customer (CreateCustomerCustomerCommand (CreateCustomer n)) =
