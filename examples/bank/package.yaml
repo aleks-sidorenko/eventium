@@ -24,13 +24,11 @@ dependencies:
   - monad-logger >= 0.3 && < 0.4
   - mtl >= 2.2 && < 2.4
   - optparse-applicative >= 0.15 && < 0.19
-  - persistent >= 2.13 && < 2.15
+  - persistent >= 2.14 && < 2.18
   - persistent-sqlite >= 2.13 && < 2.14
-  - persistent-template >= 2.12 && < 2.13
   - safe >= 0.3 && < 0.4
   - stm >= 2.5 && < 2.6
-  - x-sum-type-boilerplate >= 0.1 && < 0.2
-  - template-haskell >= 2.16 && < 2.22
+  - template-haskell >= 2.20 && < 2.23
   - text >= 1.2 && < 2.2
 
 library:

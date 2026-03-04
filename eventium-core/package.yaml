@@ -26,8 +26,7 @@ dependencies:
   - contravariant >= 1.5 && < 1.6
   - http-api-data >= 0.4 && < 0.7
   - path-pieces >= 0.2 && < 0.3
-  - x-sum-type-boilerplate >= 0.1 && < 0.2
-  - template-haskell >= 2.16 && < 2.22
+  - template-haskell >= 2.20 && < 2.23
   - text >= 1.2 && < 2.2
   - time >= 1.9 && < 1.14
   - transformers >= 0.5 && < 0.7
