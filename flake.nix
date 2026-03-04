@@ -17,8 +17,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # Use GHC 9.6.7 as requested
-        hPkgs = pkgs.haskell.packages.ghc967;
+        # Use GHC 9.10.3 (Stackage LTS 24)
+        hPkgs = pkgs.haskell.packages.ghc9103;
 
         # Define all the local packages
         localPackages = [
