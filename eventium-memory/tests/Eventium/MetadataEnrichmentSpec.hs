@@ -16,19 +16,21 @@ spec = describe "Metadata enrichment" $ do
       tvar <- eventMapTVar
       let taggedWriter = tvarEventStoreWriterTagged tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
+          reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
-      _ <- storeEvents enrichedWriter uuid NoStream [42 :: Int, 99]
-      events <- getEvents (runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)) (allEvents uuid)
-      map (eventMetadataEventType . streamEventMetadata) events `shouldBe` ["Int", "Int"]
+      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int, 99]
+      events <- reader.getEvents (allEvents uuid)
+      map (\e -> e.metadata.eventType) events `shouldBe` ["Int", "Int"]
 
     it "populates createdAt timestamp" $ do
       tvar <- eventMapTVar
       let taggedWriter = tvarEventStoreWriterTagged tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
+          reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
-      _ <- storeEvents enrichedWriter uuid NoStream [42 :: Int]
-      events <- getEvents (runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)) (allEvents uuid)
-      all (isJust . eventMetadataCreatedAt . streamEventMetadata) events `shouldBe` True
+      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
+      events <- reader.getEvents (allEvents uuid)
+      all (\e -> isJust e.metadata.createdAt) events `shouldBe` True
 
   describe "backward compatibility" $ do
     it "non-tagged writer still uses empty metadata" $ do
@@ -36,9 +38,9 @@ spec = describe "Metadata enrichment" $ do
       let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter tvar)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
-      _ <- storeEvents writer uuid NoStream [42 :: Int]
-      events <- getEvents reader (allEvents uuid)
-      map (eventMetadataEventType . streamEventMetadata) events `shouldBe` [""]
+      _ <- writer.storeEvents uuid NoStream [42 :: Int]
+      events <- reader.getEvents (allEvents uuid)
+      map (\e -> e.metadata.eventType) events `shouldBe` [""]
 
   describe "publishingEventStoreWriterTagged" $ do
     it "propagates metadata to published StreamEvents" $ do
@@ -46,12 +48,12 @@ spec = describe "Metadata enrichment" $ do
       publishedRef <- newIORef []
       let taggedWriter = runEventStoreWriterUsing atomically (tvarEventStoreWriterTagged tvar)
           handler = EventHandler $ \(StreamEvent _ _ meta _) ->
-            modifyIORef publishedRef (++ [eventMetadataEventType meta])
+            modifyIORef publishedRef (++ [meta.eventType])
           publisher = synchronousPublisher handler
           pubWriter = publishingEventStoreWriterTagged taggedWriter publisher
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec pubWriter
           uuid = uuidFromInteger 1
-      _ <- storeEvents enrichedWriter uuid NoStream [42 :: Int, 99]
+      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int, 99]
       published <- readIORef publishedRef
       published `shouldBe` ["Int", "Int"]
 

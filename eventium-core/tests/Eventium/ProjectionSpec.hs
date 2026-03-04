@@ -67,6 +67,6 @@ spec = do
       let sp = streamProjection "key" (0 :: Int) counterProjection
           event = StreamEvent "other" 5 (emptyMetadata "") (10 :: Int)
           sp' = streamProjectionEventHandler sp event
-      streamProjectionState sp' `shouldBe` 10
-      streamProjectionPosition sp' `shouldBe` 5
-      streamProjectionKey sp' `shouldBe` "key"
+      sp'.state `shouldBe` 10
+      sp'.position `shouldBe` 5
+      sp'.key `shouldBe` "key"

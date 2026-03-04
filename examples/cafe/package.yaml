@@ -16,12 +16,10 @@ dependencies:
   - eventium-sqlite >= 0.2.0 && < 0.3.0
 
   - aeson >= 1.5 && < 2.3
-  - aeson-casing >= 0.2 && < 0.3
   - aeson-pretty >= 0.8 && < 0.9
   - ansi-terminal >= 0.11 && < 1.2
   - bytestring >= 0.10 && < 0.13
   - containers >= 0.6 && < 0.8
-  - lens >= 4.19 && < 5.4
   - monad-logger >= 0.3 && < 0.4
   - mtl >= 2.2 && < 2.4
   - optparse-applicative >= 0.15 && < 0.19
@@ -35,6 +33,10 @@ library:
   source-dirs:
     - src
   ghc-options: -Wall
+  default-extensions:
+    - NoFieldSelectors
+    - DuplicateRecordFields
+    - OverloadedRecordDot
 
 executables:
   cafe-main:
@@ -42,6 +44,10 @@ executables:
     ghc-options: -Wall
     source-dirs:
       - app
+    default-extensions:
+      - NoFieldSelectors
+      - DuplicateRecordFields
+      - OverloadedRecordDot
     dependencies:
       - examples-cafe
 
@@ -50,5 +56,9 @@ executables:
     ghc-options: -Wall
     source-dirs:
       - app
+    default-extensions:
+      - NoFieldSelectors
+      - DuplicateRecordFields
+      - OverloadedRecordDot
     dependencies:
       - examples-cafe

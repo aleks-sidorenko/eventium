@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Eventium.ProjectionCache.Memory
   ( ProjectionMap,
@@ -41,9 +40,10 @@ tvarProjectionCache ::
   TVar (ProjectionMap key position encoded) ->
   ProjectionCache key position encoded STM
 tvarProjectionCache tvar =
-  let storeProjectionSnapshot uuid version projState = modifyTVar' tvar (storeProjectionInMap uuid version projState)
-      loadProjectionSnapshot uuid = Map.lookup uuid <$> readTVar tvar
-   in ProjectionCache {..}
+  ProjectionCache
+    { storeProjectionSnapshot = \uuid version projState -> modifyTVar' tvar (storeProjectionInMap uuid version projState),
+      loadProjectionSnapshot = \uuid -> Map.lookup uuid <$> readTVar tvar
+    }
 
 -- | A 'ProjectionCache' for some 'MonadState' that contains a 'ProjectionMap'.
 embeddedStateProjectionCache ::
@@ -52,9 +52,10 @@ embeddedStateProjectionCache ::
   (s -> ProjectionMap key position encoded -> s) ->
   ProjectionCache key position encoded m
 embeddedStateProjectionCache getMap setMap =
-  let storeProjectionSnapshot uuid version projState = modify' (storeProjectionSnapshot' uuid version projState)
-      loadProjectionSnapshot uuid = Map.lookup uuid <$> gets getMap
-   in ProjectionCache {..}
+  ProjectionCache
+    { storeProjectionSnapshot = \uuid version projState -> modify' (storeSnapshot uuid version projState),
+      loadProjectionSnapshot = \uuid -> Map.lookup uuid <$> gets getMap
+    }
   where
-    storeProjectionSnapshot' uuid version projState state =
-      setMap state $ storeProjectionInMap uuid version projState $ getMap state
+    storeSnapshot uuid version projState st =
+      setMap st $ storeProjectionInMap uuid version projState $ getMap st

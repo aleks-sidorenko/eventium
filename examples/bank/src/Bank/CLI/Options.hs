@@ -17,8 +17,8 @@ runOptionsParser = execParser $ info (helper <*> parseOptions) (fullDesc <> prog
 
 data Options
   = Options
-  { optionsDatabaseFile :: FilePath,
-    optionsCommand :: CLICommand
+  { databaseFile :: FilePath,
+    command :: CLICommand
   }
   deriving (Show)
 

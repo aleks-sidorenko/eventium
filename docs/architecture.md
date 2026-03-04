@@ -25,10 +25,10 @@ Every persisted event is wrapped in a `StreamEvent`:
 
 ```haskell
 data StreamEvent key position event = StreamEvent
-  { streamEventKey      :: key
-  , streamEventPosition :: position
-  , streamEventMetadata :: EventMetadata
-  , streamEventPayload  :: event
+  { key      :: key
+  , position :: position
+  , metadata :: EventMetadata
+  , payload  :: event
   }
 ```
 
@@ -94,8 +94,8 @@ monads (e.g. `STM` to `IO`, `SqlPersistT m` to `m`).
 
 ```haskell
 data Projection state event = Projection
-  { projectionSeed         :: state
-  , projectionEventHandler :: state -> event -> state
+  { seed         :: state
+  , eventHandler :: state -> event -> state
   }
 ```
 
@@ -106,12 +106,12 @@ A pure fold. Used for both write-side aggregates and read-side models.
 
 ```haskell
 data CommandHandler state event command err = CommandHandler
-  { commandHandlerDecide     :: state -> command -> Either err [event]
-  , commandHandlerProjection :: Projection state event
+  { decide     :: state -> command -> Either err [event]
+  , projection :: Projection state event
   }
 ```
 
-Implements the aggregate pattern. `commandHandlerDecide` validates business
+Implements the aggregate pattern. `decide` validates business
 rules against the current state and returns either a domain error or new events.
 `applyCommandHandler` orchestrates the full cycle: load projection, decide,
 write events.
@@ -120,9 +120,9 @@ write events.
 
 ```haskell
 data ProcessManager state event command = ProcessManager
-  { processManagerProjection :: Projection state (VersionedStreamEvent event)
-  , processManagerReact      :: state -> VersionedStreamEvent event
-                             -> [ProcessManagerEffect command]
+  { projection :: Projection state (VersionedStreamEvent event)
+  , react      :: state -> VersionedStreamEvent event
+               -> [ProcessManagerEffect command]
   }
 
 data ProcessManagerEffect command
@@ -256,7 +256,7 @@ and keeps the schema simple.
 
 ### Pure process managers
 
-`processManagerReact` returns `[ProcessManagerEffect]` -- plain data values --
+`react` returns `[ProcessManagerEffect]` -- plain data values --
 rather than performing I/O directly. This makes process manager logic
 unit-testable without mocking stores. Compensation logic is also pure:
 `IssueCommandWithCompensation` carries a function producing further effects on

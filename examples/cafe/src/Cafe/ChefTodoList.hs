@@ -9,7 +9,6 @@ import Cafe.Models.Tab
 import Control.Monad (forM_, unless)
 import Control.Monad.Logger (runNoLoggingT)
 import Data.IORef
-import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
@@ -38,8 +37,8 @@ chefTodoListMain = do
       globalReader = runEventStoreReaderUsing (`runSqlPool` pool) cliGloballyOrderedEventStore
       sub = pollingSubscription globalReader checkpoint 1000
       handler = EventHandler $ \globalEvent -> do
-        let inner = streamEventPayload globalEvent
-        case traverse (decode jsonStringCodec) inner of
+        let inner = globalEvent.payload
+        case traverse (jsonStringCodec.decode) inner of
           Nothing -> return ()
           Just tabEvent -> do
             foodMap <- readIORef foodMapRef
@@ -47,14 +46,14 @@ chefTodoListMain = do
             writeIORef foodMapRef foodMap'
             printFood foodMap'
 
-  runSubscription sub handler
+  sub.runSubscription handler
 
 handleEventToMap :: Map UUID [Maybe Food] -> VersionedStreamEvent TabEvent -> Map UUID [Maybe Food]
 handleEventToMap foodMap (StreamEvent uuid _ _ (TabClosed _)) = Map.delete uuid foodMap
 handleEventToMap foodMap streamEvent =
-  let uuid = streamEventKey streamEvent
+  let uuid = streamEvent.key
       oldList = Map.findWithDefault [] uuid foodMap
-   in Map.insert uuid (handleEventToFood oldList $ streamEventPayload streamEvent) foodMap
+   in Map.insert uuid (handleEventToFood oldList streamEvent.payload) foodMap
 
 handleEventToFood :: [Maybe Food] -> TabEvent -> [Maybe Food]
 handleEventToFood oldFood (FoodOrdered newFood) = oldFood ++ map Just newFood

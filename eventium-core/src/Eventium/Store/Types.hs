@@ -30,7 +30,6 @@ where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Time (UTCTime)
-import Eventium.Json (unPrefixLower)
 import Eventium.UUID
 import GHC.Generics (Generic)
 import Web.HttpApiData
@@ -38,19 +37,19 @@ import Web.PathPieces
 
 -- | Metadata carried alongside every stored event.
 data EventMetadata = EventMetadata
-  { eventMetadataEventType :: !Text,
-    eventMetadataCorrelationId :: !(Maybe UUID),
-    eventMetadataCausationId :: !(Maybe UUID),
-    eventMetadataCreatedAt :: !(Maybe UTCTime)
+  { eventType :: !Text,
+    correlationId :: !(Maybe UUID),
+    causationId :: !(Maybe UUID),
+    createdAt :: !(Maybe UTCTime)
   }
   deriving (Show, Eq, Generic)
 
 instance ToJSON EventMetadata where
-  toJSON = genericToJSON (unPrefixLower "eventMetadata")
-  toEncoding = genericToEncoding (unPrefixLower "eventMetadata")
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 instance FromJSON EventMetadata where
-  parseJSON = genericParseJSON (unPrefixLower "eventMetadata")
+  parseJSON = genericParseJSON defaultOptions
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata
@@ -61,8 +60,8 @@ emptyMetadata et = EventMetadata et Nothing Nothing Nothing
 -- Store backends that accept @TaggedEvent@ will use the attached metadata
 -- instead of generating empty metadata.
 data TaggedEvent event = TaggedEvent
-  { taggedEventMetadata :: !EventMetadata,
-    taggedEventPayload :: !event
+  { metadata :: !EventMetadata,
+    payload :: !event
   }
   deriving (Show, Eq, Functor)
 
@@ -70,10 +69,10 @@ data TaggedEvent event = TaggedEvent
 -- @position@ in that event stream, and 'EventMetadata'.
 data StreamEvent key position event
   = StreamEvent
-  { streamEventKey :: !key,
-    streamEventPosition :: !position,
-    streamEventMetadata :: !EventMetadata,
-    streamEventPayload :: !event
+  { key :: !key,
+    position :: !position,
+    metadata :: !EventMetadata,
+    payload :: !event
   }
   deriving (Show, Eq, Functor, Foldable, Traversable)
 

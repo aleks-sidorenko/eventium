@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -55,13 +54,13 @@ initializeSqliteEventStore ::
   SqlEventStoreConfig entity serialized ->
   ConnectionPool ->
   m ()
-initializeSqliteEventStore SqlEventStoreConfig {..} pool = do
+initializeSqliteEventStore config pool = do
   -- Run migrations
   _ <- liftIO $ runSqlPool (runMigrationSilent migrateSqlEvent) pool
 
   -- Create index on uuid field so retrieval is very fast
-  let tableName = unEntityNameDB $ tableDBName (sqlEventStoreConfigSequenceMakeEntity undefined undefined undefined undefined)
-      uuidFieldName = unFieldNameDB $ fieldDBName sqlEventStoreConfigSequenceNumberField
+  let tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity undefined undefined undefined undefined)
+      uuidFieldName = unFieldNameDB $ fieldDBName config.sequenceNumberField
       indexSql =
         "CREATE INDEX IF NOT EXISTS "
           <> uuidFieldName

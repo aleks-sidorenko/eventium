@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Bank.ProcessManagers.TransferManager
   ( TransferManager (..),
     TransferManagerTransferData (..),
@@ -10,7 +7,6 @@ module Bank.ProcessManagers.TransferManager
 where
 
 import Bank.Models
-import Control.Lens
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
@@ -19,18 +15,16 @@ import Eventium
 
 newtype TransferManager
   = TransferManager
-  { _transferManagerData :: Map UUID TransferManagerTransferData
+  { transferData :: Map UUID TransferManagerTransferData
   }
   deriving (Show)
 
 data TransferManagerTransferData
   = TransferManagerTransferData
-  { transferSourceAccount :: UUID,
-    transferTargetAccount :: UUID
+  { sourceAccount :: UUID,
+    targetAccount :: UUID
   }
   deriving (Show, Eq)
-
-makeLenses ''TransferManager
 
 transferManagerDefault :: TransferManager
 transferManagerDefault = TransferManager Map.empty
@@ -42,48 +36,52 @@ transferManagerProjection =
     handleTransferEvent
 
 handleTransferEvent :: TransferManager -> VersionedStreamEvent BankEvent -> TransferManager
-handleTransferEvent manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEvent AccountTransferStarted {..})) =
+handleTransferEvent manager (StreamEvent sourceAcct _ _ (AccountTransferStartedEvent evt)) =
   manager
-    & transferManagerData . at accountTransferStartedTransferId
-      ?~ TransferManagerTransferData
-        { transferSourceAccount = sourceAccount,
-          transferTargetAccount = accountTransferStartedTargetAccount
-        }
+    { transferData =
+        Map.insert
+          evt.transferId
+          TransferManagerTransferData
+            { sourceAccount = sourceAcct,
+              targetAccount = evt.targetAccount
+            }
+          manager.transferData
+    }
 handleTransferEvent manager _ = manager
 
 reactTransfer :: TransferManager -> VersionedStreamEvent BankEvent -> [ProcessManagerEffect BankCommand]
-reactTransfer manager (StreamEvent sourceAccount _ _ (AccountTransferStartedEvent AccountTransferStarted {..}))
-  | isNothing (manager ^. transferManagerData . at accountTransferStartedTransferId) =
+reactTransfer manager (StreamEvent sourceAcct _ _ (AccountTransferStartedEvent evt))
+  | isNothing (Map.lookup evt.transferId manager.transferData) =
       [ IssueCommandWithCompensation
-          accountTransferStartedTargetAccount
+          evt.targetAccount
           ( AcceptTransferCommand
               AcceptTransfer
-                { acceptTransferTransferId = accountTransferStartedTransferId,
-                  acceptTransferSourceAccount = sourceAccount,
-                  acceptTransferAmount = accountTransferStartedAmount
+                { transferId = evt.transferId,
+                  sourceAccount = sourceAcct,
+                  amount = evt.amount
                 }
           )
-          ( \(RejectionReason reason) ->
+          ( \(RejectionReason rejectionReason) ->
               [ IssueCommand
-                  sourceAccount
+                  sourceAcct
                   ( RejectTransferCommand
                       RejectTransfer
-                        { rejectTransferTransferId = accountTransferStartedTransferId,
-                          rejectTransferReason = T.unpack reason
+                        { transferId = evt.transferId,
+                          reason = T.unpack rejectionReason
                         }
                   )
               ]
           )
       ]
   | otherwise = []
-reactTransfer manager (StreamEvent _ _ _ (AccountCreditedFromTransferEvent AccountCreditedFromTransfer {..})) =
-  maybe [] mkEffect (manager ^. transferManagerData . at accountCreditedFromTransferTransferId)
+reactTransfer manager (StreamEvent _ _ _ (AccountCreditedFromTransferEvent evt)) =
+  maybe [] mkEffect (Map.lookup evt.transferId manager.transferData)
   where
-    mkEffect (TransferManagerTransferData sourceId _) =
+    mkEffect (TransferManagerTransferData sourceAcct _) =
       [ IssueCommand
-          sourceId
+          sourceAcct
           ( CompleteTransferCommand $
-              CompleteTransfer accountCreditedFromTransferTransferId
+              CompleteTransfer evt.transferId
           )
       ]
 reactTransfer _ _ = []

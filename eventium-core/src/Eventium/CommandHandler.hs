@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 -- | Defines a Command Handler type.
 --
 -- A 'CommandHandler' is the combination of a 'Projection' (to reconstruct
@@ -33,8 +31,8 @@ import Eventium.UUID
 -- command is rejected.
 data CommandHandler state event command err
   = CommandHandler
-  { commandHandlerDecide :: state -> command -> Either err [event],
-    commandHandlerProjection :: Projection state event
+  { decide :: state -> command -> Either err [event],
+    projection :: Projection state event
   }
 
 -- | Errors that can occur when applying a command handler.
@@ -60,12 +58,12 @@ applyCommandHandler ::
   UUID ->
   command ->
   m (Either (CommandHandlerError err) [event])
-applyCommandHandler writer reader (CommandHandler handler proj) uuid command = do
-  StreamProjection {..} <- getLatestStreamProjection reader (versionedStreamProjection uuid proj)
-  case handler streamProjectionState command of
+applyCommandHandler writer reader cmdHandler uuid command = do
+  sp <- getLatestStreamProjection reader (versionedStreamProjection uuid cmdHandler.projection)
+  case cmdHandler.decide sp.state command of
     Left err -> return $ Left (CommandRejected err)
     Right events -> do
-      result <- storeEvents writer uuid (ExactPosition streamProjectionPosition) events
+      result <- writer.storeEvents uuid (ExactPosition sp.position) events
       case result of
         Left writeErr -> return $ Left (ConcurrencyConflict writeErr)
         Right _ -> return $ Right events
@@ -80,14 +78,14 @@ codecCommandHandler ::
   Codec command encodedCommand ->
   CommandHandler state event command err ->
   CommandHandler state encodedEvent encodedCommand err
-codecCommandHandler eventCodec commandCodec (CommandHandler commandHandler projection) =
+codecCommandHandler eventCodec commandCodec cmdHandler =
   CommandHandler codecHandler codecProjection'
   where
-    codecProjection' = codecProjection eventCodec projection
-    codecHandler state encodedCmd =
-      case decode commandCodec encodedCmd of
+    codecProjection' = codecProjection eventCodec cmdHandler.projection
+    codecHandler st encodedCmd =
+      case commandCodec.decode encodedCmd of
         Nothing -> throw $ DecodeError "codecCommandHandler" "Failed to decode command"
-        Just cmd -> fmap (map (encode eventCodec)) (commandHandler state cmd)
+        Just cmd -> fmap (map eventCodec.encode) (cmdHandler.decide st cmd)
 
 -- | Like 'codecCommandHandler' but uses 'TypeEmbedding's instead of
 -- 'Codec's. Intended for embedding aggregate-specific event\/command
@@ -102,11 +100,11 @@ embeddedCommandHandler ::
   TypeEmbedding command adaptedCommand ->
   CommandHandler state event command err ->
   CommandHandler state adaptedEvent adaptedCommand err
-embeddedCommandHandler eventEmb commandEmb (CommandHandler commandHandler projection) =
+embeddedCommandHandler eventEmb commandEmb cmdHandler =
   CommandHandler embeddedHandler embeddedProjection'
   where
-    embeddedProjection' = embeddedProjection eventEmb projection
-    embeddedHandler state adaptedCmd =
-      case extract commandEmb adaptedCmd of
+    embeddedProjection' = embeddedProjection eventEmb cmdHandler.projection
+    embeddedHandler st adaptedCmd =
+      case commandEmb.extract adaptedCmd of
         Nothing -> Right []
-        Just cmd -> fmap (map (embed eventEmb)) (commandHandler state cmd)
+        Just cmd -> fmap (map eventEmb.embed) (cmdHandler.decide st cmd)

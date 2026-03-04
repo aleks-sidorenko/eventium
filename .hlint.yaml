@@ -1,0 +1,5 @@
+# OverloadedRecordDot causes hlint false positives:
+# - `record.id` is interpreted as `record . id` (compose with identity)
+# - `(expr).field` is interpreted as redundant brackets around function composition
+- ignore: {name: "Redundant id"}
+- ignore: {name: "Redundant bracket"}

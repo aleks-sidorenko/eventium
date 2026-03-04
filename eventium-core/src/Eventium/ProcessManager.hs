@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 -- | Defines a Process Manager (saga) abstraction for orchestrating
 -- interactions across multiple event streams.
@@ -38,13 +37,13 @@ import Eventium.UUID
 -- | A 'ProcessManager' manages interaction between event streams. It
 -- listens to events and decides what commands to issue to other aggregates.
 --
--- * 'processManagerProjection' — a pure fold over versioned stream events
+-- * 'projection' — a pure fold over versioned stream events
 --   that tracks the process manager's state.
--- * 'processManagerReact' — a pure function that, given the current state
+-- * 'react' — a pure function that, given the current state
 --   and a new event, returns a list of effects to execute.
 data ProcessManager state event command = ProcessManager
-  { processManagerProjection :: Projection state (VersionedStreamEvent event),
-    processManagerReact :: state -> VersionedStreamEvent event -> [ProcessManagerEffect command]
+  { projection :: Projection state (VersionedStreamEvent event),
+    react :: state -> VersionedStreamEvent event -> [ProcessManagerEffect command]
   }
 
 -- | A typed wrapper for the reason a command was rejected.
@@ -118,9 +117,9 @@ runProcessManagerEffects ::
 runProcessManagerEffects dispatcher = mapM_ go
   where
     go (IssueCommand uuid cmd) =
-      void $ dispatchCommand dispatcher uuid cmd
+      void $ dispatcher.dispatchCommand uuid cmd
     go (IssueCommandWithCompensation uuid cmd onFailure) = do
-      result <- dispatchCommand dispatcher uuid cmd
+      result <- dispatcher.dispatchCommand uuid cmd
       case result of
         CommandSucceeded -> pure ()
         CommandFailed reason -> mapM_ go (onFailure reason)
@@ -131,7 +130,7 @@ runProcessManagerEffects dispatcher = mapM_ go
 -- For each incoming event:
 --
 --   1. Rebuilds the process manager state from the global event stream
---   2. Calls 'processManagerReact' with the current state and the new event
+--   2. Calls 'react' with the current state and the new event
 --   3. Executes the resulting effects via the dispatcher
 processManagerEventHandler ::
   (Monad m) =>
@@ -140,7 +139,7 @@ processManagerEventHandler ::
   CommandDispatcher m command ->
   EventHandler m (VersionedStreamEvent event)
 processManagerEventHandler pm globalReader dispatcher = EventHandler $ \event -> do
-  let globalProjection = globalStreamProjection (processManagerProjection pm)
-  StreamProjection {..} <- getLatestStreamProjection globalReader globalProjection
-  let effects = processManagerReact pm streamProjectionState event
+  let globalProj = globalStreamProjection pm.projection
+  sp <- getLatestStreamProjection globalReader globalProj
+  let effects = pm.react sp.state event
   runProcessManagerEffects dispatcher effects

@@ -129,7 +129,7 @@ codecEventStoreReader ::
 codecEventStoreReader codec (EventStoreReader reader) =
   EventStoreReader $ fmap (map strictDecode) . reader
   where
-    strictDecode s = case decode codec s of
+    strictDecode s = case codec.decode s of
       Just a -> a
       Nothing -> throw $ DecodeError "codecEventStoreReader" "Failed to decode event"
 
@@ -144,7 +144,7 @@ lenientCodecEventStoreReader ::
   EventStoreReader key position m encoded ->
   EventStoreReader key position m event
 lenientCodecEventStoreReader codec (EventStoreReader reader) =
-  EventStoreReader $ fmap (mapMaybe (decode codec)) . reader
+  EventStoreReader $ fmap (mapMaybe codec.decode) . reader
 
 -- | Convenience wrapper around 'codecEventStoreReader' for
 -- 'VersionedEventStoreReader'.
@@ -171,7 +171,7 @@ codecEventStoreWriter ::
   Codec event encoded ->
   EventStoreWriter key position m encoded ->
   EventStoreWriter key position m event
-codecEventStoreWriter codec = contramap (encode codec)
+codecEventStoreWriter codec = contramap codec.encode
 
 -- | Wraps an 'EventStoreWriter' that accepts 'TaggedEvent's, producing a
 -- writer that accepts domain events. Each event is encoded and tagged
@@ -197,7 +197,7 @@ metadataEnrichingEventStoreWriter codec (EventStoreWriter write) =
             ( \e ->
                 TaggedEvent
                   (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
-                  (encode codec e)
+                  (codec.encode e)
             )
             events
     write key pos tagged
@@ -214,7 +214,7 @@ tagEvents codec now =
   map $ \e ->
     TaggedEvent
       (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
-      (encode codec e)
+      (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of
 -- a 'Codec'. Intended for embedding aggregate-specific event types into
@@ -223,4 +223,4 @@ embeddedEventStoreWriter ::
   TypeEmbedding event adapted ->
   EventStoreWriter key position m adapted ->
   EventStoreWriter key position m event
-embeddedEventStoreWriter emb = contramap (embed emb)
+embeddedEventStoreWriter emb = contramap emb.embed

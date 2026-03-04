@@ -39,14 +39,14 @@ tvarGlobalStreamProjectionCacheRunner = GlobalStreamProjectionCacheRunner $ \act
 stateVersionedProjectionCacheRunner :: VersionedProjectionCacheRunner (StateT (StreamEmbeddedState Counter CounterEvent) IO)
 stateVersionedProjectionCacheRunner = VersionedProjectionCacheRunner $ \action -> evalStateT (action writer reader cache) emptyEmbeddedState
   where
-    writer = embeddedStateEventStoreWriter embeddedEventMap setEventMap
-    reader = embeddedStateEventStoreReader embeddedEventMap
-    cache = embeddedStateProjectionCache embeddedProjectionMap setProjectionMap
+    writer = embeddedStateEventStoreWriter (.eventMap) setEventMap
+    reader = embeddedStateEventStoreReader (.eventMap)
+    cache = embeddedStateProjectionCache (.projectionMap) setProjectionMap
 
 stateGlobalStreamProjectionCacheRunner :: GlobalStreamProjectionCacheRunner (StateT (GlobalStreamEmbeddedState Counter CounterEvent Text) IO)
 stateGlobalStreamProjectionCacheRunner =
   GlobalStreamProjectionCacheRunner $ \action -> evalStateT (action writer globalReader cache) emptyEmbeddedState
   where
-    writer = embeddedStateEventStoreWriter embeddedEventMap setEventMap
-    globalReader = embeddedStateGlobalEventStoreReader embeddedEventMap
-    cache = embeddedStateProjectionCache embeddedProjectionMap setProjectionMap
+    writer = embeddedStateEventStoreWriter (.eventMap) setEventMap
+    globalReader = embeddedStateGlobalEventStoreReader (.eventMap)
+    cache = embeddedStateProjectionCache (.projectionMap) setProjectionMap

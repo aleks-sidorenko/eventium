@@ -1,7 +1,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Eventium.Codec
@@ -54,8 +53,8 @@ data Codec a b = Codec
 -- 'lenientCodecEventHandler', 'lenientCodecEventStoreReader') which
 -- silently skip unrecognized events instead of throwing.
 data DecodeError = DecodeError
-  { decodeErrorContext :: !String,
-    decodeErrorMessage :: !String
+  { context :: !String,
+    message :: !String
   }
   deriving (Show, Eq)
 
@@ -65,8 +64,8 @@ instance Exception DecodeError
 -- This indicates a programming error: the source sum type contains a
 -- constructor not present in the target sum type.
 data EncodeError = EncodeError
-  { encodeErrorContext :: !String,
-    encodeErrorMessage :: !String
+  { context :: !String,
+    message :: !String
   }
   deriving (Show, Eq)
 
@@ -78,8 +77,8 @@ instance Exception EncodeError
 composeCodecs :: Codec a b -> Codec b c -> Codec a c
 composeCodecs codec1 codec2 = Codec encode' decode'
   where
-    encode' = encode codec2 . encode codec1
-    decode' x = decode codec2 x >>= decode codec1
+    encode' = codec2.encode . codec1.encode
+    decode' x = codec2.decode x >>= codec1.decode
 
 -- | Simple "codec" using 'id'. Useful for when an API requires a
 -- codec but you don't need to actually change types.
@@ -91,11 +90,11 @@ traverseCodec ::
   (Traversable t) =>
   Codec a b ->
   Codec (t a) (t b)
-traverseCodec Codec {..} =
+traverseCodec codec =
   Codec encode' decode'
   where
-    encode' = fmap encode
-    decode' = traverse decode
+    encode' = fmap codec.encode
+    decode' = traverse codec.decode
 
 -- | A 'Codec' for aeson 'Value's.
 jsonCodec :: (Typeable a, ToJSON a, FromJSON a) => Codec a Value

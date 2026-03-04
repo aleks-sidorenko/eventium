@@ -1,5 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Defines an event subscription abstraction for push-based event delivery.
@@ -64,12 +63,12 @@ pollOnce ::
   EventHandler m (GlobalStreamEvent event) ->
   m ()
 pollOnce globalReader checkpoint pollIntervalMs handler = do
-  latestSeq <- getCheckpoint checkpoint
-  newEvents <- getEvents globalReader (eventsStartingAt () $ latestSeq + 1)
+  latestSeq <- checkpoint.getCheckpoint
+  newEvents <- globalReader.getEvents (eventsStartingAt () $ latestSeq + 1)
   handleEvents handler newEvents
   case NE.nonEmpty newEvents of
     Nothing -> return ()
-    Just ne -> saveCheckpoint checkpoint (streamEventPosition $ NE.last ne)
+    Just ne -> checkpoint.saveCheckpoint (NE.last ne).position
   delayMillis pollIntervalMs
 
 -- | Create a polling-based 'EventSubscription' that reads from the global
@@ -102,16 +101,14 @@ projectionPollOnce ::
   PollingIntervalMillis ->
   m ()
 projectionPollOnce globalReader proj checkpoint pollIntervalMs = do
-  (latestSeq, currentState) <- getCheckpoint checkpoint
-  newEvents <- getEvents globalReader (eventsStartingAt () $ latestSeq + 1)
+  (latestSeq, currentState) <- checkpoint.getCheckpoint
+  newEvents <- globalReader.getEvents (eventsStartingAt () $ latestSeq + 1)
   let (finalSeq, finalState) = foldl' applyGlobalEvent (latestSeq, currentState) newEvents
-  saveCheckpoint checkpoint (finalSeq, finalState)
+  checkpoint.saveCheckpoint (finalSeq, finalState)
   delayMillis pollIntervalMs
   where
-    applyGlobalEvent (_, state) globalEvent =
-      let innerEvent = streamEventPayload globalEvent
-          newState = projectionEventHandler proj state innerEvent
-          newSeq = streamEventPosition globalEvent
+    applyGlobalEvent (_, st) (StreamEvent _ newSeq _ innerEvent) =
+      let newState = proj.eventHandler st innerEvent
        in (newSeq, newState)
 
 -- | Convenience function to run a polling loop that maintains a
@@ -135,17 +132,17 @@ runProjectionSubscription globalReader proj checkpoint pollIntervalMs =
 -- encounters an exception.
 data RetryConfig = RetryConfig
   { -- | Initial delay before the first retry, in milliseconds.
-    retryInitialDelayMs :: !Int,
+    initialDelayMs :: !Int,
     -- | Maximum backoff delay in milliseconds (caps exponential growth).
-    retryMaxDelayMs :: !Int,
+    maxDelayMs :: !Int,
     -- | Multiplier for exponential backoff on consecutive failures.
-    retryBackoffMultiplier :: !Double,
+    backoffMultiplier :: !Double,
     -- | Predicate called on each exception. Return 'True' to retry
     -- (after backoff), 'False' to re-throw and kill the subscription.
-    retryOnError :: SomeException -> IO Bool,
+    onError :: SomeException -> IO Bool,
     -- | Callback invoked on each caught exception. Receives the exception
     -- and the consecutive error count (1 on first failure). Use for logging.
-    retryOnErrorCallback :: SomeException -> Int -> IO ()
+    onErrorCallback :: SomeException -> Int -> IO ()
   }
 
 -- | Sensible defaults: 1 second initial delay, 30 second cap, 2x backoff,
@@ -153,11 +150,11 @@ data RetryConfig = RetryConfig
 defaultRetryConfig :: RetryConfig
 defaultRetryConfig =
   RetryConfig
-    { retryInitialDelayMs = 1000,
-      retryMaxDelayMs = 30000,
-      retryBackoffMultiplier = 2.0,
-      retryOnError = const (return True),
-      retryOnErrorCallback = \_ _ -> return ()
+    { initialDelayMs = 1000,
+      maxDelayMs = 30000,
+      backoffMultiplier = 2.0,
+      onError = const (return True),
+      onErrorCallback = \_ _ -> return ()
     }
 
 -- | Like 'pollingSubscription' but with automatic error recovery.
@@ -184,7 +181,7 @@ resilientPollingSubscription ::
   PollingIntervalMillis ->
   RetryConfig ->
   EventSubscription m (GlobalStreamEvent event)
-resilientPollingSubscription unlift globalReader checkpoint pollIntervalMs retryConfig =
+resilientPollingSubscription unlift globalReader checkpoint pollIntervalMs retryCfg =
   EventSubscription $ \handler -> loop handler 0
   where
     loop handler consecutiveErrors = do
@@ -192,12 +189,12 @@ resilientPollingSubscription unlift globalReader checkpoint pollIntervalMs retry
       case result of
         Right () -> loop handler 0
         Left (ex :: SomeException) -> do
-          shouldRetry <- liftIO $ retryOnError retryConfig ex
+          shouldRetry <- liftIO $ retryCfg.onError ex
           if shouldRetry
             then do
               let newCount = consecutiveErrors + 1
-              liftIO $ retryOnErrorCallback retryConfig ex newCount
-              liftIO $ threadDelay (backoffMicros retryConfig newCount)
+              liftIO $ retryCfg.onErrorCallback ex newCount
+              liftIO $ threadDelay (backoffMicros retryCfg newCount)
               loop handler newCount
             else liftIO $ throwIO ex
 
@@ -212,7 +209,7 @@ resilientRunProjectionSubscription ::
   PollingIntervalMillis ->
   RetryConfig ->
   m ()
-resilientRunProjectionSubscription unlift globalReader proj checkpoint pollIntervalMs retryConfig =
+resilientRunProjectionSubscription unlift globalReader proj checkpoint pollIntervalMs retryCfg =
   loop 0
   where
     loop consecutiveErrors = do
@@ -220,20 +217,20 @@ resilientRunProjectionSubscription unlift globalReader proj checkpoint pollInter
       case result of
         Right () -> loop 0
         Left (ex :: SomeException) -> do
-          shouldRetry <- liftIO $ retryOnError retryConfig ex
+          shouldRetry <- liftIO $ retryCfg.onError ex
           if shouldRetry
             then do
               let newCount = consecutiveErrors + 1
-              liftIO $ retryOnErrorCallback retryConfig ex newCount
-              liftIO $ threadDelay (backoffMicros retryConfig newCount)
+              liftIO $ retryCfg.onErrorCallback ex newCount
+              liftIO $ threadDelay (backoffMicros retryCfg newCount)
               loop newCount
             else liftIO $ throwIO ex
 
 backoffMicros :: RetryConfig -> Int -> Int
-backoffMicros RetryConfig {..} count =
+backoffMicros retryCfg count =
   let delayMs =
-        min retryMaxDelayMs $
-          round (fromIntegral retryInitialDelayMs * retryBackoffMultiplier ^^ max 0 (count - 1))
+        min retryCfg.maxDelayMs $
+          round (fromIntegral retryCfg.initialDelayMs * retryCfg.backoffMultiplier ^^ max 0 (count - 1))
    in delayMs * 1000
 
 -- | Sleep for the given number of milliseconds.

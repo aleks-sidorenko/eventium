@@ -21,6 +21,7 @@ just ghcid          # continuous compilation
 ```
 
 **Running a single package's tests:**
+
 ```
 cabal test eventium-core
 cabal test eventium-memory
@@ -30,9 +31,17 @@ cabal test examples-bank
 ```
 
 **PostgreSQL tests** require a running Postgres instance. Use `docker compose up -d` to start one. Tests use these env vars (with defaults matching docker-compose.yaml):
+
 - `POSTGRES_HOST` (127.0.0.1), `POSTGRES_PORT` (5432), `POSTGRES_USER` (postgres), `POSTGRES_PASSWORD` (password), `POSTGRES_DBNAME` (eventium_test)
 
-**Linting:** `hlint` (run on CI against all git-tracked `.hs` files). **Formatting:** `ormolu`.
+## Code Style
+
+- **Formatter**: ormolu (mandatory, no manual overrides)
+- **Linter**: hlint — no suppressions allowed without explicit approval and documented rationale
+- **GHC warnings**: `-Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wpartial-fields`
+- **Required extensions**: `NoImplicitPrelude`, `StrictData`, `GADTs`, `KindSignatures`, `DataKinds`, `TypeFamilies`, `NoFieldSelectors`, `DuplicateRecordFields`, `OverloadedRecordDot`
+- Never export data constructors or field selectors directly — use smart constructors and accessor functions
+- Total functions only; no partial functions
 
 ## Package Architecture
 

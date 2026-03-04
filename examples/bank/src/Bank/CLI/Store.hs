@@ -15,7 +15,7 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Data.Aeson
 import Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy.Char8 as BSL
-import Data.Text (Text, pack)
+import Data.Text (pack)
 import Database.Persist.Sqlite
 import Eventium
 import Eventium.Store.Sqlite
@@ -28,7 +28,7 @@ cliEventStoreReader = codecVersionedEventStoreReader jsonStringCodec $ sqlEventS
 
 cliEventStoreWriter :: (MonadIO m) => VersionedEventStoreWriter (SqlPersistT m) BankEvent
 cliEventStoreWriter =
-  publishingEventStoreWriter writer (synchronousPublisher eventHandler)
+  publishingEventStoreWriter writer (synchronousPublisher eventHandler')
   where
     sqlStore = sqliteEventStoreWriter defaultSqlEventStoreConfig
     writer = codecEventStoreWriter jsonStringCodec sqlStore
@@ -37,8 +37,8 @@ cliEventStoreWriter =
         cliEventStoreWriter
         cliEventStoreReader
         [mkAggregateHandlerWith formatAccountError accountBankCommandHandler]
-    eventHandler =
-      EventHandler (\event -> liftIO $ printJSONPretty (streamEventKey event, streamEventPayload event))
+    eventHandler' =
+      EventHandler (\event -> liftIO $ printJSONPretty (event.key, event.payload))
         <> processManagerEventHandler transferProcessManager cliGlobalEventStoreReader dispatcher
 
 formatAccountError :: AccountCommandError -> RejectionReason

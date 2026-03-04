@@ -28,8 +28,7 @@ spec = do
       ref <- newIORef ([] :: [Int])
       let handler = EventHandler $ \(StreamEvent _ _ _ e) -> modifyIORef ref (++ [e])
           publisher = synchronousPublisher handler
-      publishEvents
-        publisher
+      publisher.publishEvents
         nil
         [ StreamEvent nil 0 (emptyMetadata "") (1 :: Int),
           StreamEvent nil 1 (emptyMetadata "") 2,
@@ -47,13 +46,13 @@ spec = do
           publisher = synchronousPublisher handler
           publishingWriter = publishingEventStoreWriter writer publisher
 
-      _ <- storeEvents publishingWriter (uuidFromInteger 1) NoStream [10, 20, 30 :: Int]
+      _ <- publishingWriter.storeEvents (uuidFromInteger 1) NoStream [10, 20, 30 :: Int]
 
       readIORef ref `shouldReturn` [10, 20, 30]
 
       -- Verify events are also stored
-      events <- getEvents reader (allEvents (uuidFromInteger 1))
-      map streamEventPayload events `shouldBe` [10, 20, 30]
+      events <- reader.getEvents (allEvents (uuidFromInteger 1))
+      map (.payload) events `shouldBe` [10, 20, 30]
 
     it "should NOT publish events when the write fails" $ do
       tvar <- eventMapTVar
@@ -65,7 +64,7 @@ spec = do
           publishingWriter = publishingEventStoreWriter writer publisher
 
       -- Write should fail due to ExactPosition mismatch
-      result <- storeEvents publishingWriter (uuidFromInteger 1) (ExactPosition 5) [10 :: Int]
+      result <- publishingWriter.storeEvents (uuidFromInteger 1) (ExactPosition 5) [10 :: Int]
       result `shouldSatisfy` isLeft'
 
       readIORef ref `shouldReturn` []
@@ -80,7 +79,7 @@ spec = do
           publishingWriter = publishingEventStoreWriter writer publisher
 
       let uuid1 = uuidFromInteger 1
-      _ <- storeEvents publishingWriter uuid1 NoStream [100, 200 :: Int]
+      _ <- publishingWriter.storeEvents uuid1 NoStream [100, 200 :: Int]
 
       readIORef ref
         `shouldReturn` [ (uuid1, 0, 100),
@@ -109,8 +108,7 @@ spec = do
       let handlerA = EventHandler $ \(StreamEvent _ _ _ (e :: String)) ->
             when (e == "trigger") $ do
               _ <-
-                storeEvents
-                  rawWriter
+                rawWriter.storeEvents
                   (uuidFromInteger 99)
                   AnyPosition
                   ["handler-a-generated"]
@@ -127,7 +125,7 @@ spec = do
       -- Handler B should see BOTH original events ("trigger" and "normal")
       -- sequentially. Handler A's written events go to the raw writer and
       -- are NOT re-published through the handler chain.
-      _ <- storeEvents publishingWriter (uuidFromInteger 1) NoStream ["trigger", "normal" :: String]
+      _ <- publishingWriter.storeEvents (uuidFromInteger 1) NoStream ["trigger", "normal" :: String]
 
       observed <- readIORef orderRef
 

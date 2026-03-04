@@ -34,14 +34,14 @@ instance PersistFieldSql UUID where
   sqlType _ = SqlOther "uuid"
 
 instance PersistField EventVersion where
-  toPersistValue = toPersistValue . unEventVersion
+  toPersistValue (EventVersion n) = toPersistValue n
   fromPersistValue = fmap EventVersion . fromPersistValue
 
 instance PersistFieldSql EventVersion where
   sqlType _ = sqlType (Proxy :: Proxy Int)
 
 instance PersistField SequenceNumber where
-  toPersistValue = toPersistValue . unSequenceNumber
+  toPersistValue (SequenceNumber n) = toPersistValue n
   fromPersistValue = fmap SequenceNumber . fromPersistValue
 
 instance PersistFieldSql SequenceNumber where

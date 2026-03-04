@@ -60,22 +60,22 @@ spec = do
 
   describe "mkSumTypeCodec" $ do
     it "can serialize events" $ do
-      encode myEventsCodec (MyEventsEventA EventA) `shouldBe` AllEventsEventA EventA
-      encode myEventsCodec (MyEventsEventB EventB) `shouldBe` AllEventsEventB EventB
+      myEventsCodec.encode (MyEventsEventA EventA) `shouldBe` AllEventsEventA EventA
+      myEventsCodec.encode (MyEventsEventB EventB) `shouldBe` AllEventsEventB EventB
 
     it "can deserialize events" $ do
-      decode myEventsCodec (AllEventsEventA EventA) `shouldBe` Just (MyEventsEventA EventA)
-      decode myEventsCodec (AllEventsEventB EventB) `shouldBe` Just (MyEventsEventB EventB)
-      decode myEventsCodec (AllEventsEventC EventC) `shouldBe` Nothing
+      myEventsCodec.decode (AllEventsEventA EventA) `shouldBe` Just (MyEventsEventA EventA)
+      myEventsCodec.decode (AllEventsEventB EventB) `shouldBe` Just (MyEventsEventB EventB)
+      myEventsCodec.decode (AllEventsEventC EventC) `shouldBe` Nothing
 
   describe "mkSumTypeEmbedding" $ do
     it "can embed events" $ do
-      embed subsetEventsEmbedding (SubsetEventsEventA EventA) `shouldBe` AllEventsEventA EventA
-      embed subsetEventsEmbedding (SubsetEventsEventB EventB) `shouldBe` AllEventsEventB EventB
+      subsetEventsEmbedding.embed (SubsetEventsEventA EventA) `shouldBe` AllEventsEventA EventA
+      subsetEventsEmbedding.embed (SubsetEventsEventB EventB) `shouldBe` AllEventsEventB EventB
 
     it "can extract matching events" $ do
-      extract subsetEventsEmbedding (AllEventsEventA EventA) `shouldBe` Just (SubsetEventsEventA EventA)
-      extract subsetEventsEmbedding (AllEventsEventB EventB) `shouldBe` Just (SubsetEventsEventB EventB)
+      subsetEventsEmbedding.extract (AllEventsEventA EventA) `shouldBe` Just (SubsetEventsEventA EventA)
+      subsetEventsEmbedding.extract (AllEventsEventB EventB) `shouldBe` Just (SubsetEventsEventB EventB)
 
     it "returns Nothing for non-matching events" $ do
-      extract subsetEventsEmbedding (AllEventsEventC EventC) `shouldBe` Nothing
+      subsetEventsEmbedding.extract (AllEventsEventC EventC) `shouldBe` Nothing

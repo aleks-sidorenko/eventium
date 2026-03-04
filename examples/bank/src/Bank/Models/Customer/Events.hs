@@ -7,7 +7,7 @@ module Bank.Models.Customer.Events
   )
 where
 
-import Bank.Json
+import Data.Aeson.TH
 import Language.Haskell.TH (Name)
 
 customerEvents :: [Name]
@@ -18,15 +18,15 @@ customerEvents =
 
 newtype CustomerCreated
   = CustomerCreated
-  { customerCreatedName :: String
+  { name :: String
   }
   deriving (Show, Eq)
 
 newtype CustomerCreationRejected
   = CustomerCreationRejected
-  { customerCreationRejectedReason :: String
+  { reason :: String
   }
   deriving (Show, Eq)
 
-deriveJSONUnPrefixLower ''CustomerCreated
-deriveJSONUnPrefixLower ''CustomerCreationRejected
+deriveJSON defaultOptions ''CustomerCreated
+deriveJSON defaultOptions ''CustomerCreationRejected

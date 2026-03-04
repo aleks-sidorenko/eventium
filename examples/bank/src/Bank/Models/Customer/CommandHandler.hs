@@ -16,10 +16,10 @@ import SumTypesX.TH
 constructSumType "CustomerCommand" (defaultSumTypeOptions {sumTypeOptionsTagOptions = AppendTypeNameToTags}) customerCommands
 
 handleCustomerCommand :: Customer -> CustomerCommand -> Either Void [CustomerEvent]
-handleCustomerCommand customer (CreateCustomerCustomerCommand (CreateCustomer name)) =
+handleCustomerCommand customer (CreateCustomerCustomerCommand (CreateCustomer n)) =
   Right $
-    case customerName customer of
-      Nothing -> [CustomerCreatedCustomerEvent $ CustomerCreated name]
+    case customer.name of
+      Nothing -> [CustomerCreatedCustomerEvent $ CustomerCreated n]
       Just _ -> [CustomerCreationRejectedCustomerEvent $ CustomerCreationRejected "Customer already exists"]
 
 customerCommandHandler :: CommandHandler Customer CustomerEvent CustomerCommand Void

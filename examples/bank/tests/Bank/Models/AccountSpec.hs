@@ -39,7 +39,7 @@ spec = do
       let stateAfterStarted = latestProjection accountProjection events
 
       accountAvailableBalance stateAfterStarted `shouldBe` 4
-      commandHandlerDecide accountCommandHandler stateAfterStarted (DebitAccountAccountCommand (DebitAccount 9 "blah"))
+      accountCommandHandler.decide stateAfterStarted (DebitAccountAccountCommand (DebitAccount 9 "blah"))
         `shouldBe` Left (InsufficientFunds 4)
 
       let events' = events ++ [AccountTransferCompletedAccountEvent $ AccountTransferCompleted transferUuid]

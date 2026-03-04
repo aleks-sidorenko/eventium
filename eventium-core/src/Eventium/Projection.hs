@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Eventium.Projection
   ( Projection (..),
     latestProjection,
@@ -37,27 +35,27 @@ import Eventium.UUID
 data Projection state event
   = Projection
   { -- | Initial state of a projection
-    projectionSeed :: state,
+    seed :: state,
     -- | The function that applies and event to the current state, producing a
     -- new state.
-    projectionEventHandler :: state -> event -> state
+    eventHandler :: state -> event -> state
   }
 
 instance Contravariant (Projection state) where
-  contramap f (Projection seed handler) = Projection seed handler'
+  contramap f (Projection s handler) = Projection s handler'
     where
       handler' state event = handler state (f event)
 
 -- | Computes the latest state of a 'Projection' from some events.
 latestProjection :: (Foldable t) => Projection state event -> t event -> state
-latestProjection (Projection seed handler) = foldl' handler seed
+latestProjection proj = foldl' proj.eventHandler proj.seed
 
 -- | Given a list of events, produce all the Projections that were ever
--- produced. Just a 'scanl' using 'projectionEventHandler'. This function is
+-- produced. Just a 'scanl' using 'eventHandler'. This function is
 -- useful for testing 'Projection's; you can easily assert that all the states
 -- of a Projection are valid given a list of events.
 allProjections :: Projection state event -> [event] -> [state]
-allProjections (Projection seed handler) = scanl' handler seed
+allProjections proj = scanl' proj.eventHandler proj.seed
 
 -- | A 'StreamProjection' is a 'Projection' that has been constructed from
 -- events from a particular event stream. This is useful when we want to cache
@@ -65,10 +63,10 @@ allProjections (Projection seed handler) = scanl' handler seed
 -- is caught up to.
 data StreamProjection key position state event
   = StreamProjection
-  { streamProjectionKey :: !key,
-    streamProjectionPosition :: !position,
-    streamProjectionProjection :: !(Projection state event),
-    streamProjectionState :: !state
+  { key :: !key,
+    position :: !position,
+    projection :: !(Projection state event),
+    state :: !state
   }
 
 type VersionedStreamProjection = StreamProjection UUID EventVersion
@@ -81,8 +79,8 @@ streamProjection ::
   position ->
   Projection state event ->
   StreamProjection key position state event
-streamProjection key position projection@Projection {..} =
-  StreamProjection key position projection projectionSeed
+streamProjection k pos proj =
+  StreamProjection k pos proj proj.seed
 
 -- | Initialize a 'VersionedStreamProjection'.
 versionedStreamProjection ::
@@ -105,11 +103,10 @@ streamProjectionEventHandler ::
   StreamProjection key position state event ->
   StreamEvent eventKey position event ->
   StreamProjection key position state event
-streamProjectionEventHandler StreamProjection {..} streamEvent =
-  let Projection {..} = streamProjectionProjection
-      position' = streamEventPosition streamEvent
-      state' = projectionEventHandler streamProjectionState (streamEventPayload streamEvent)
-   in StreamProjection streamProjectionKey position' streamProjectionProjection state'
+streamProjectionEventHandler sp streamEvent =
+  let position' = streamEvent.position
+      state' = sp.projection.eventHandler sp.state streamEvent.payload
+   in StreamProjection sp.key position' sp.projection state'
 
 -- | Gets the latest projection from a store by querying events from the latest
 -- order key and then applying the events using the Projection's event handler.
@@ -118,9 +115,9 @@ getLatestStreamProjection ::
   EventStoreReader key position m (StreamEvent key position event) ->
   StreamProjection key position state event ->
   m (StreamProjection key position state event)
-getLatestStreamProjection (EventStoreReader getEvents') projection@StreamProjection {..} = do
-  events <- getEvents' (eventsStartingAt streamProjectionKey $ streamProjectionPosition + 1)
-  return $ foldl' streamProjectionEventHandler projection events
+getLatestStreamProjection (EventStoreReader getEvents') sp = do
+  events <- getEvents' (eventsStartingAt sp.key $ sp.position + 1)
+  return $ foldl' streamProjectionEventHandler sp events
 
 -- | Use a 'Codec' to wrap a 'Projection' with event type @event@ so it
 -- uses the @encoded@ type. Throws 'DecodeError' if decoding
@@ -129,12 +126,12 @@ codecProjection ::
   Codec event encoded ->
   Projection state event ->
   Projection state encoded
-codecProjection codec (Projection seed handler) =
-  Projection seed handler'
+codecProjection codec (Projection s handler) =
+  Projection s handler'
   where
-    handler' state encoded =
-      case decode codec encoded of
-        Just event -> handler state event
+    handler' st encoded =
+      case codec.decode encoded of
+        Just event -> handler st event
         Nothing -> throw $ DecodeError "codecProjection" "Failed to decode event"
 
 -- | Like 'codecProjection' but silently drops events that fail to
@@ -147,7 +144,7 @@ lenientCodecProjection ::
   Codec event encoded ->
   Projection state event ->
   Projection state encoded
-lenientCodecProjection codec = projectionMapMaybe (decode codec)
+lenientCodecProjection codec = projectionMapMaybe codec.decode
 
 -- | Adapt a 'Projection' using a 'TypeEmbedding'. Events that do not belong
 -- to the embedded subset are silently skipped. This is the correct semantics
@@ -157,7 +154,7 @@ embeddedProjection ::
   TypeEmbedding event adapted ->
   Projection state event ->
   Projection state adapted
-embeddedProjection emb = projectionMapMaybe (extract emb)
+embeddedProjection emb = projectionMapMaybe emb.extract
 
 -- | Transform a 'Projection' when you only have a partial relationship between
 -- the source event type and the target event type.
@@ -165,6 +162,6 @@ projectionMapMaybe ::
   (eventB -> Maybe eventA) ->
   Projection state eventA ->
   Projection state eventB
-projectionMapMaybe f (Projection seed handler) = Projection seed handler'
+projectionMapMaybe f (Projection s handler) = Projection s handler'
   where
-    handler' state = maybe state (handler state) . f
+    handler' st = maybe st (handler st) . f

@@ -114,7 +114,7 @@ examples/bank/
     CLI.hs               -- top-level CLI
     Json.hs              -- JSON helpers
   tests/Bank/Models/
-    AccountSpec.hs       -- command handler tests using commandHandlerDecide
+    AccountSpec.hs       -- command handler tests using decide
 ```
 
 ## Testing
@@ -123,10 +123,10 @@ examples/bank/
 cabal test examples-bank
 ```
 
-Tests exercise `commandHandlerDecide` directly:
+Tests exercise the `decide` function directly via dot syntax:
 
 ```haskell
-commandHandlerDecide accountCommandHandler stateAfterDeposit
+accountCommandHandler.decide stateAfterDeposit
   (DebitAccountAccountCommand (DebitAccount 9 "ref"))
   `shouldBe` Right [AccountDebitRejectedAccountEvent $ AccountDebitRejected 4]
 ```
