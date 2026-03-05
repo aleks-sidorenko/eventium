@@ -12,6 +12,7 @@ import qualified Data.Text.Encoding as TE
 import Data.UUID
 import Database.Persist
 import Database.Persist.Sql
+import Eventium.ProjectionCache.Types (ProjectionName (..))
 import Eventium.Store.Class
 import Eventium.UUID
 
@@ -43,3 +44,10 @@ instance PersistField SequenceNumber where
 
 instance PersistFieldSql SequenceNumber where
   sqlType _ = sqlType (Proxy :: Proxy Int)
+
+instance PersistField ProjectionName where
+  toPersistValue (ProjectionName t) = toPersistValue t
+  fromPersistValue = fmap ProjectionName . fromPersistValue
+
+instance PersistFieldSql ProjectionName where
+  sqlType _ = sqlType (Proxy :: Proxy T.Text)
