@@ -1,7 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Eventium.ProjectionCache.Types
-  ( ProjectionCache (..),
+  ( module Eventium.ProjectionCache.ProjectionName,
+    ProjectionCache (..),
     VersionedProjectionCache,
     GlobalStreamProjectionCache,
     runProjectionCacheUsing,
@@ -15,6 +16,7 @@ where
 
 import Eventium.Codec
 import Eventium.Projection
+import Eventium.ProjectionCache.ProjectionName
 import Eventium.Store.Class
 import Eventium.UUID
 
