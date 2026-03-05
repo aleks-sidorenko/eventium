@@ -5,6 +5,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -41,7 +43,7 @@ newtype ProjectionName = ProjectionName Text
   deriving (Show, Read, Eq, Ord, ToJSON, FromJSON, PersistField, PersistFieldSql)
 
 share
-  [mkPersist sqlSettings, mkMigrate "migrateProjectionSnapshot"]
+  [mkPersist sqlSettings {mpsFieldLabelModifier = const id}, mkMigrate "migrateProjectionSnapshot"]
   [persistLowerCase|
 ProjectionSnapshotEntity sql=projection_snapshots
     projectionName ProjectionName
@@ -70,15 +72,15 @@ sqlVersionedProjectionCache name =
         now <- liftIO getCurrentTime
         repsert (ProjectionSnapshotEntityKey name uuid) $
           ProjectionSnapshotEntity
-            { projectionSnapshotEntityProjectionName = name,
-              projectionSnapshotEntityEntityId = uuid,
-              projectionSnapshotEntityPosition = ver,
-              projectionSnapshotEntityState = state,
-              projectionSnapshotEntityUpdatedAt = now
+            { projectionName = name,
+              entityId = uuid,
+              position = ver,
+              state = state,
+              updatedAt = now
             },
       loadSnapshot = \uuid -> do
         mEntity <- get (ProjectionSnapshotEntityKey name uuid)
-        return $ fmap (\(ProjectionSnapshotEntity _ _ pos st _) -> (EventVersion pos, st)) mEntity
+        return $ fmap (\e -> (EventVersion e.position, e.state)) mEntity
     }
 
 -- | A SQL-backed 'ProjectionCache' for global blob snapshots.
@@ -98,13 +100,13 @@ sqlGlobalProjectionCache name =
         now <- liftIO getCurrentTime
         repsert (ProjectionSnapshotEntityKey name nil) $
           ProjectionSnapshotEntity
-            { projectionSnapshotEntityProjectionName = name,
-              projectionSnapshotEntityEntityId = nil,
-              projectionSnapshotEntityPosition = sn,
-              projectionSnapshotEntityState = state,
-              projectionSnapshotEntityUpdatedAt = now
+            { projectionName = name,
+              entityId = nil,
+              position = sn,
+              state = state,
+              updatedAt = now
             },
       loadSnapshot = \() -> do
         mEntity <- get (ProjectionSnapshotEntityKey name nil)
-        return $ fmap (\(ProjectionSnapshotEntity _ _ pos st _) -> (SequenceNumber pos, st)) mEntity
+        return $ fmap (\e -> (SequenceNumber e.position, e.state)) mEntity
     }
