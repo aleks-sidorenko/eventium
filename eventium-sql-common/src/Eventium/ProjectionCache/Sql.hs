@@ -48,7 +48,7 @@ ProjectionSnapshotEntity sql=projection_snapshots
     entityId UUID sql=key
     position Int
     state JSONString
-    updatedAt UTCTime default=now()
+    updatedAt UTCTime
     Primary projectionName entityId
     deriving Show
 |]
