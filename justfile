@@ -24,3 +24,7 @@ ghcid *ARGS:
 # Format all Haskell source files with ormolu
 format:
     find . -name '*.hs' -not -path './dist-newstyle/*' -exec ormolu --mode inplace {} +
+
+# Publish to Hackage (candidate by default, use --publish to publish for real)
+hackage-publish *ARGS:
+    ./scripts/publish-to-hackage.sh {{ARGS}}
