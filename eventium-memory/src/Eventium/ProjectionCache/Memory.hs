@@ -6,7 +6,7 @@ module Eventium.ProjectionCache.Memory
     projectionMapTVar,
     tvarProjectionCache,
     embeddedStateProjectionCache,
-    module Eventium.ProjectionCache.Types,
+    module Eventium.ProjectionCache.Cache,
   )
 where
 
@@ -14,7 +14,7 @@ import Control.Concurrent.STM
 import Control.Monad.State.Class hiding (state)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Eventium.ProjectionCache.Types
+import Eventium.ProjectionCache.Cache
 
 -- | A 'ProjectionMap' just stores the latest snapshot for each UUID.
 type ProjectionMap key position encoded = Map key (position, encoded)
@@ -41,8 +41,8 @@ tvarProjectionCache ::
   ProjectionCache key position encoded STM
 tvarProjectionCache tvar =
   ProjectionCache
-    { storeProjectionSnapshot = \uuid version projState -> modifyTVar' tvar (storeProjectionInMap uuid version projState),
-      loadProjectionSnapshot = \uuid -> Map.lookup uuid <$> readTVar tvar
+    { storeSnapshot = \uuid version projState -> modifyTVar' tvar (storeProjectionInMap uuid version projState),
+      loadSnapshot = \uuid -> Map.lookup uuid <$> readTVar tvar
     }
 
 -- | A 'ProjectionCache' for some 'MonadState' that contains a 'ProjectionMap'.
@@ -53,8 +53,8 @@ embeddedStateProjectionCache ::
   ProjectionCache key position encoded m
 embeddedStateProjectionCache getMap setMap =
   ProjectionCache
-    { storeProjectionSnapshot = \uuid version projState -> modify' (storeSnapshot uuid version projState),
-      loadProjectionSnapshot = \uuid -> Map.lookup uuid <$> gets getMap
+    { storeSnapshot = \uuid version projState -> modify' (storeSnapshot uuid version projState),
+      loadSnapshot = \uuid -> Map.lookup uuid <$> gets getMap
     }
   where
     storeSnapshot uuid version projState st =

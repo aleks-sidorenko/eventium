@@ -1,5 +1,5 @@
 module Eventium.ProjectionCache.Sqlite
-  ( sqliteProjectionCache,
+  ( sqliteVersionedProjectionCache,
     sqliteGlobalProjectionCache,
     initializeSqliteProjectionCache,
     migrateProjectionSnapshot,
@@ -9,19 +9,19 @@ where
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Database.Persist.Sql (ConnectionPool, SqlPersistT, runMigrationSilent, runSqlPool)
-import Eventium.ProjectionCache.Sql (migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlProjectionCache)
-import Eventium.ProjectionCache.Types (ProjectionCache, ProjectionName)
+import Eventium.ProjectionCache.Sql (ProjectionName, migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
+import Eventium.ProjectionCache.Types (ProjectionCache)
 import Eventium.Store.Class (EventVersion, SequenceNumber)
 import Eventium.Store.Sql.JSONString (JSONString)
 import Eventium.UUID (UUID)
 
 -- | SQLite-backed 'ProjectionCache' for per-entity snapshots.
--- Alias for 'sqlProjectionCache'.
-sqliteProjectionCache ::
+-- Alias for 'sqlVersionedProjectionCache'.
+sqliteVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
   ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
-sqliteProjectionCache = sqlProjectionCache
+sqliteVersionedProjectionCache = sqlVersionedProjectionCache
 
 -- | SQLite-backed 'ProjectionCache' for global blob snapshots.
 -- Alias for 'sqlGlobalProjectionCache'.

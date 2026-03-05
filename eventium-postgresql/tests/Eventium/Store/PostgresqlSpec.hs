@@ -2,11 +2,8 @@
 
 module Eventium.Store.PostgresqlSpec (spec) where
 
-import Control.Monad.Reader (ask)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.UTF8 as UTF8
-import Data.Maybe (maybe)
-import Data.Text (Text)
 import Database.Persist.Postgresql
 import Eventium.Store.Postgresql
 import Eventium.Testkit

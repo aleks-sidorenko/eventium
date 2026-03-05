@@ -20,8 +20,8 @@ module Eventium.Testkit
     globalStreamEventStoreSpec,
     VersionedProjectionCacheRunner (..),
     versionedProjectionCacheSpec,
-    GlobalStreamProjectionCacheRunner (..),
-    globalStreamProjectionCacheSpec,
+    GlobalProjectionCacheRunner (..),
+    globalProjectionCacheSpec,
     Text,
     module X,
   )
@@ -339,8 +339,8 @@ versionedProjectionCacheSpec (VersionedProjectionCacheRunner withStoreAndCache) 
   context "when the store is empty" $ do
     it "should be able to store and load simple projections" $ do
       snapshot <- withStoreAndCache $ \_ _ cache -> do
-        cache.storeProjectionSnapshot nil 4 (Counter 100)
-        cache.loadProjectionSnapshot nil
+        cache.storeSnapshot nil 4 (Counter 100)
+        cache.loadSnapshot nil
       snapshot `shouldBe` Just (4, Counter 100)
 
   context "when the store has some events in one stream" $ do
@@ -351,51 +351,51 @@ versionedProjectionCacheSpec (VersionedProjectionCacheRunner withStoreAndCache) 
       snapshot.position `shouldBe` 1
       snapshot.state `shouldBe` Counter 3
 
-    it "should work with updateProjectionCache" $ do
+    it "should work with updateVersionedProjectionCache" $ do
       snapshot <- withStoreAndCache $ \writer reader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2, Added 3]
-        updateProjectionCache reader cache (versionedStreamProjection nil counterProjection)
+        updateVersionedProjectionCache reader cache (versionedStreamProjection nil counterProjection)
         getLatestVersionedProjectionWithCache reader cache (versionedStreamProjection nil counterProjection)
       snapshot.key `shouldBe` nil
       snapshot.position `shouldBe` 2
       snapshot.state `shouldBe` Counter 6
 
-newtype GlobalStreamProjectionCacheRunner m
-  = GlobalStreamProjectionCacheRunner
+newtype GlobalProjectionCacheRunner m
+  = GlobalProjectionCacheRunner
       ( forall a.
         ( VersionedEventStoreWriter m CounterEvent ->
           GlobalEventStoreReader m CounterEvent ->
-          GlobalStreamProjectionCache Text Counter m ->
+          GlobalProjectionCache Counter m ->
           m a
         ) ->
         IO a
       )
 
-globalStreamProjectionCacheSpec ::
+globalProjectionCacheSpec ::
   (Monad m) =>
-  GlobalStreamProjectionCacheRunner m ->
+  GlobalProjectionCacheRunner m ->
   Spec
-globalStreamProjectionCacheSpec (GlobalStreamProjectionCacheRunner withStoreAndCache) = do
+globalProjectionCacheSpec (GlobalProjectionCacheRunner withStoreAndCache) = do
   context "when the store is empty" $ do
     it "should be able to store and load simple projections" $ do
       snapshot <- withStoreAndCache $ \_ _ cache -> do
-        cache.storeProjectionSnapshot "key" 4 (Counter 100)
-        cache.loadProjectionSnapshot "key"
+        cache.storeSnapshot () 4 (Counter 100)
+        cache.loadSnapshot ()
       snapshot `shouldBe` Just (4, Counter 100)
 
   context "when the store has some events in one stream" $ do
     it "should load from a global stream of events" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2]
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 2
       snapshot.state `shouldBe` Counter 3
 
     it "should work with updateGlobalProjectionCache" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2, Added 3]
-        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection)
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 3
       snapshot.state `shouldBe` Counter 6
 
@@ -403,7 +403,7 @@ globalStreamProjectionCacheSpec (GlobalStreamProjectionCacheRunner withStoreAndC
     it "should have the correct cached projection value" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         insertExampleEvents writer
-        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection)
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 5
       snapshot.state `shouldBe` Counter 15

@@ -14,14 +14,17 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Eventium.ProjectionCache.Sql
-  ( ProjectionSnapshotEntity (..),
+  ( ProjectionName (..),
+    ProjectionSnapshotEntity (..),
     migrateProjectionSnapshot,
-    sqlProjectionCache,
+    sqlVersionedProjectionCache,
     sqlGlobalProjectionCache,
   )
 where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Aeson (FromJSON, ToJSON)
+import Data.Text (Text)
 import Data.Time (UTCTime, getCurrentTime)
 import Database.Persist
 import Database.Persist.Sql
@@ -31,6 +34,11 @@ import Eventium.Store.Class (EventVersion (..), SequenceNumber (..))
 import Eventium.Store.Sql.JSONString (JSONString)
 import Eventium.Store.Sql.Orphans ()
 import Eventium.UUID (UUID, nil)
+
+-- | A name identifying a projection in the projection cache.
+-- Used as a discriminator so multiple projections can share one storage table.
+newtype ProjectionName = ProjectionName Text
+  deriving (Show, Read, Eq, Ord, ToJSON, FromJSON, PersistField, PersistFieldSql)
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateProjectionSnapshot"]
@@ -52,13 +60,13 @@ ProjectionSnapshotEntity sql=projection_snapshots
 --
 -- Composes with 'codecProjectionCache' for state encoding.
 -- Works with both PostgreSQL and SQLite via Persistent.
-sqlProjectionCache ::
+sqlVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
   ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
-sqlProjectionCache name =
+sqlVersionedProjectionCache name =
   ProjectionCache
-    { storeProjectionSnapshot = \uuid (EventVersion ver) state -> do
+    { storeSnapshot = \uuid (EventVersion ver) state -> do
         now <- liftIO getCurrentTime
         repsert (ProjectionSnapshotEntityKey name uuid) $
           ProjectionSnapshotEntity
@@ -68,7 +76,7 @@ sqlProjectionCache name =
               projectionSnapshotEntityState = state,
               projectionSnapshotEntityUpdatedAt = now
             },
-      loadProjectionSnapshot = \uuid -> do
+      loadSnapshot = \uuid -> do
         mEntity <- get (ProjectionSnapshotEntityKey name uuid)
         return $ fmap (\(ProjectionSnapshotEntity _ _ pos st _) -> (EventVersion pos, st)) mEntity
     }
@@ -86,7 +94,7 @@ sqlGlobalProjectionCache ::
   ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
 sqlGlobalProjectionCache name =
   ProjectionCache
-    { storeProjectionSnapshot = \() (SequenceNumber sn) state -> do
+    { storeSnapshot = \() (SequenceNumber sn) state -> do
         now <- liftIO getCurrentTime
         repsert (ProjectionSnapshotEntityKey name nil) $
           ProjectionSnapshotEntity
@@ -96,7 +104,7 @@ sqlGlobalProjectionCache name =
               projectionSnapshotEntityState = state,
               projectionSnapshotEntityUpdatedAt = now
             },
-      loadProjectionSnapshot = \() -> do
+      loadSnapshot = \() -> do
         mEntity <- get (ProjectionSnapshotEntityKey name nil)
         return $ fmap (\(ProjectionSnapshotEntity _ _ pos st _) -> (SequenceNumber pos, st)) mEntity
     }

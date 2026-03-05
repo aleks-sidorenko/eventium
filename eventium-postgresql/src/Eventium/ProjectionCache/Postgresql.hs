@@ -1,5 +1,5 @@
 module Eventium.ProjectionCache.Postgresql
-  ( postgresqlProjectionCache,
+  ( postgresqlVersionedProjectionCache,
     postgresqlGlobalProjectionCache,
     migrateProjectionSnapshot,
   )
@@ -7,19 +7,19 @@ where
 
 import Control.Monad.IO.Class (MonadIO)
 import Database.Persist.Sql (SqlPersistT)
-import Eventium.ProjectionCache.Sql (migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlProjectionCache)
-import Eventium.ProjectionCache.Types (ProjectionCache, ProjectionName)
+import Eventium.ProjectionCache.Sql (ProjectionName, migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
+import Eventium.ProjectionCache.Types (ProjectionCache)
 import Eventium.Store.Class (EventVersion, SequenceNumber)
 import Eventium.Store.Sql.JSONString (JSONString)
 import Eventium.UUID (UUID)
 
 -- | PostgreSQL-backed 'ProjectionCache' for per-entity snapshots.
--- Alias for 'sqlProjectionCache'.
-postgresqlProjectionCache ::
+-- Alias for 'sqlVersionedProjectionCache'.
+postgresqlVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
   ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
-postgresqlProjectionCache = sqlProjectionCache
+postgresqlVersionedProjectionCache = sqlVersionedProjectionCache
 
 -- | PostgreSQL-backed 'ProjectionCache' for global blob snapshots.
 -- Alias for 'sqlGlobalProjectionCache'.
