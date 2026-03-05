@@ -51,7 +51,6 @@ type GlobalStreamProjectionCache key encoded m = ProjectionCache key SequenceNum
 -- | Changes the monad a 'ProjectionCache' runs in. This is useful to run the
 -- cache in another 'Monad' while forgetting the original 'Monad'.
 runProjectionCacheUsing ::
-  (Monad m, Monad mstore) =>
   (forall a. mstore a -> m a) ->
   ProjectionCache key position encoded mstore ->
   ProjectionCache key position encoded m

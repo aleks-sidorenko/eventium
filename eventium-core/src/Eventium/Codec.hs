@@ -97,7 +97,7 @@ traverseCodec codec =
     decode' = traverse codec.decode
 
 -- | A 'Codec' for aeson 'Value's.
-jsonCodec :: (Typeable a, ToJSON a, FromJSON a) => Codec a Value
+jsonCodec :: (ToJSON a, FromJSON a) => Codec a Value
 jsonCodec =
   Codec
     { encode = toJSON,
@@ -109,7 +109,7 @@ jsonCodec =
 
 -- | A 'Codec' to convert JSON to/from lazy text. Useful for Sql event
 -- stores that store JSON values as text.
-jsonTextCodec :: (Typeable a, ToJSON a, FromJSON a) => Codec a TL.Text
+jsonTextCodec :: (ToJSON a, FromJSON a) => Codec a TL.Text
 jsonTextCodec =
   Codec
     { encode = TLE.decodeUtf8 . Aeson.encode,

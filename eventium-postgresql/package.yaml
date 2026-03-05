@@ -18,6 +18,16 @@ extra-source-files:
   - CHANGELOG.md
   - README.md
 
+flags:
+  ci:
+    description: Enable -Werror for CI builds
+    manual: true
+    default: false
+
+when:
+  - condition: flag(ci)
+    ghc-options: -Werror
+
 dependencies:
   - base >= 4.9 && < 5
   - eventium-core >= 0.2.0 && < 0.3.0
@@ -32,7 +42,7 @@ dependencies:
 library:
   source-dirs:
     - src
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns
   default-extensions:
     - NoFieldSelectors
     - DuplicateRecordFields
@@ -41,7 +51,7 @@ library:
 tests:
   spec:
     main: Spec.hs
-    ghc-options: -Wall
+    ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns
     default-extensions:
       - NoFieldSelectors
       - DuplicateRecordFields

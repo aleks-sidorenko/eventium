@@ -59,7 +59,6 @@ eventHandlerMapMaybe f (EventHandler h) = EventHandler $ \e -> for_ (f e) h
 -- of the encoded type. Throws 'DecodeError' if decoding fails.
 -- Use 'lenientCodecEventHandler' to silently skip failures.
 codecEventHandler ::
-  (Applicative m) =>
   Codec event encoded ->
   EventHandler m event ->
   EventHandler m encoded

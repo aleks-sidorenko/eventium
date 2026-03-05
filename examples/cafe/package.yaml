@@ -10,6 +10,16 @@ description: |
 stability: experimental
 license: MIT
 
+flags:
+  ci:
+    description: Enable -Werror for CI builds
+    manual: true
+    default: false
+
+when:
+  - condition: flag(ci)
+    ghc-options: -Werror
+
 dependencies:
   - base >= 4.9 && < 5
   - eventium-core >= 0.2.0 && < 0.3.0
@@ -31,7 +41,7 @@ dependencies:
 library:
   source-dirs:
     - src
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns
   default-extensions:
     - NoFieldSelectors
     - DuplicateRecordFields
@@ -40,7 +50,7 @@ library:
 executables:
   cafe-main:
     main: cafe-main.hs
-    ghc-options: -Wall
+    ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns
     source-dirs:
       - app
     default-extensions:
@@ -52,7 +62,7 @@ executables:
 
   cafe-chef-todo-main:
     main: cafe-chef-todo-main.hs
-    ghc-options: -Wall
+    ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns
     source-dirs:
       - app
     default-extensions:

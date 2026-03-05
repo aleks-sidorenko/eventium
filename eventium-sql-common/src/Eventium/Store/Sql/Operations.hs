@@ -84,7 +84,7 @@ sqlEventToVersioned config entity =
     (config.payload entity)
 
 sqlGetProjectionIds ::
-  (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
+  (MonadIO m, PersistEntity entity) =>
   SqlEventStoreConfig entity serialized ->
   SqlPersistT m [UUID]
 sqlGetProjectionIds config =
@@ -136,7 +136,7 @@ sqlGetAllEventsInRange config query = do
     selectOpts = Asc config.sequenceNumberField : endSelectOpt
 
 sqlMaxEventVersion ::
-  (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
+  (MonadIO m, PersistEntity entity) =>
   SqlEventStoreConfig entity serialized ->
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->

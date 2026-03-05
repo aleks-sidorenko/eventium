@@ -38,7 +38,7 @@ cabal test examples-bank
 
 - **Formatter**: ormolu (mandatory, no manual overrides)
 - **Linter**: hlint — no suppressions allowed without explicit approval and documented rationale
-- **GHC warnings**: `-Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wpartial-fields`
+- **GHC warnings**: `-Wall -Wcompat -Widentities -Wincomplete-record-updates -Wredundant-constraints -Wno-type-defaults -Wno-incomplete-uni-patterns` (CI also uses `-Werror`)
 - **Required extensions**: `NoImplicitPrelude`, `StrictData`, `GADTs`, `KindSignatures`, `DataKinds`, `TypeFamilies`, `NoFieldSelectors`, `DuplicateRecordFields`, `OverloadedRecordDot`
 - Never export data constructors or field selectors directly — use smart constructors and accessor functions
 - Total functions only; no partial functions

@@ -1,6 +1,5 @@
 module Eventium.EventHandlerSpec (spec) where
 
-import Control.Exception (evaluate)
 import Data.Functor.Contravariant
 import Data.IORef
 import Eventium.Codec (Codec (..), DecodeError (..))

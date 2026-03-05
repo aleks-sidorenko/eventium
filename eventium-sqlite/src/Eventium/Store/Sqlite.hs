@@ -48,7 +48,7 @@ maxSqliteVersionSql (FieldNameDB tableName) (FieldNameDB uuidFieldName) (FieldNa
 -- | This functions runs the migrations required to create the events table and
 -- also adds an index on the UUID column.
 initializeSqliteEventStore ::
-  (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend) =>
+  (MonadIO m, PersistEntity entity) =>
   SqlEventStoreConfig entity serialized ->
   ConnectionPool ->
   m ()

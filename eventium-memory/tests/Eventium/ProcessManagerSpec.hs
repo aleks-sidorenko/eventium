@@ -36,7 +36,6 @@ testProcessManager =
       [IssueCommand target (AcceptCredit amount)]
     reactFn _st (StreamEvent sourceId _ _ (Credited _)) =
       [IssueCommand sourceId (AcceptCredit 0)]
-    reactFn _ _ = []
 
 spec :: Spec
 spec = do

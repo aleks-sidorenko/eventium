@@ -103,7 +103,6 @@ transactionalExpectedWriteHelper' (Just f) getLatestVersion' storeEvents' uuid e
 -- | Changes the monad an 'EventStoreReader' runs in. This is useful to run
 -- event stores in another 'Monad' while forgetting the original 'Monad'.
 runEventStoreReaderUsing ::
-  (Monad m, Monad mstore) =>
   (forall a. mstore a -> m a) ->
   EventStoreReader key position mstore event ->
   EventStoreReader key position m event
@@ -111,7 +110,6 @@ runEventStoreReaderUsing runStore (EventStoreReader f) = EventStoreReader (runSt
 
 -- | Analog of 'runEventStoreReaderUsing' for a 'EventStoreWriter'.
 runEventStoreWriterUsing ::
-  (Monad m, Monad mstore) =>
   (forall a. mstore a -> m a) ->
   EventStoreWriter key position mstore event ->
   EventStoreWriter key position m event

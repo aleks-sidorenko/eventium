@@ -96,7 +96,7 @@ jobs:
       - name: Build all packages
         run: |
           cabal update
-          cabal build all -j
+          cabal build all -j -fci
 
       - name: Wait for Postgres to be ready
         env:
@@ -118,4 +118,4 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DBNAME: eventium_test
-        run: cabal test all -j --test-show-details=direct --enable-tests
+        run: cabal test all -j --test-show-details=direct --enable-tests -fci
