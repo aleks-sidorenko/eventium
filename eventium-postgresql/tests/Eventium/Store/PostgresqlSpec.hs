@@ -46,7 +46,7 @@ makeStore = do
           sqlEventStoreReader defaultSqlEventStoreConfig
   connString <-
     makeConnString
-      <$> getEnvDef "POSTGRES_HOST" "localhost"
+      <$> getEnvDef "POSTGRES_HOST" "127.0.0.1"
       <*> getEnvDef "POSTGRES_PORT" "5432"
       <*> getEnvDef "POSTGRES_USER" "postgres"
       <*> getEnvDef "POSTGRES_PASSWORD" "password"

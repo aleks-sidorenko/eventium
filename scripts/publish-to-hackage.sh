@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Default to candidate upload (safer)
-UPLOAD_TYPE="--candidate"
+# Default to candidate upload (safer — candidate is cabal's default)
+UPLOAD_TYPE="candidate"
 UPLOAD_DOCS="false"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     --publish)
-      UPLOAD_TYPE="--publish"
+      UPLOAD_TYPE="publish"
       shift
       ;;
     --candidate)
-      UPLOAD_TYPE="--candidate"
+      UPLOAD_TYPE="candidate"
       shift
       ;;
     --with-docs)
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate options
-if [ "$UPLOAD_DOCS" = "true" ] && [ "$UPLOAD_TYPE" = "--candidate" ]; then
+if [ "$UPLOAD_DOCS" = "true" ] && [ "$UPLOAD_TYPE" = "candidate" ]; then
   echo "⚠️  Warning: Documentation cannot be uploaded for candidates."
   echo "Documentation will only be uploaded when using --publish flag."
   echo ""
@@ -61,7 +61,7 @@ echo "📦 Publish to Hackage Script"
 echo "============================"
 echo ""
 
-if [ "$UPLOAD_TYPE" = "--publish" ]; then
+if [ "$UPLOAD_TYPE" = "publish" ]; then
   echo "⚠️  Mode: PUBLISH (will make packages publicly available)"
 else
   echo "ℹ️  Mode: CANDIDATE (safe preview, not publicly available)"
@@ -117,11 +117,15 @@ fi
 # Upload each tarball
 for tarball in $TAR_FILES; do
   echo "  Uploading $(basename "$tarball")..."
-  cabal upload "$UPLOAD_TYPE" --token "$HACKAGE_TOKEN" "$tarball"
+  if [ "$UPLOAD_TYPE" = "publish" ]; then
+    cabal upload --publish --token "$HACKAGE_TOKEN" "$tarball"
+  else
+    cabal upload --token "$HACKAGE_TOKEN" "$tarball"
+  fi
 done
 
 echo ""
-if [ "$UPLOAD_TYPE" = "--publish" ]; then
+if [ "$UPLOAD_TYPE" = "publish" ]; then
   echo "✅ All packages successfully published to Hackage!"
 else
   echo "✅ All packages successfully uploaded as candidates!"
@@ -171,7 +175,7 @@ fi
 echo "📋 Summary:"
 echo "  - Ran hpack on all package.yaml files"
 echo "  - Created source distributions for ${#PROJECTS[@]} packages"
-if [ "$UPLOAD_TYPE" = "--publish" ]; then
+if [ "$UPLOAD_TYPE" = "publish" ]; then
   echo "  - Published all packages to Hackage (publicly available)"
   if [ "$UPLOAD_DOCS" = "true" ]; then
     echo "  - Built and uploaded documentation"
