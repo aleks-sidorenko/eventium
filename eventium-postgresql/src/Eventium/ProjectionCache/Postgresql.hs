@@ -1,13 +1,16 @@
 module Eventium.ProjectionCache.Postgresql
   ( postgresqlVersionedProjectionCache,
     postgresqlGlobalProjectionCache,
+    postgresqlCheckpointStore,
+    CheckpointName (..),
     migrateProjectionSnapshot,
   )
 where
 
 import Control.Monad.IO.Class (MonadIO)
 import Database.Persist.Sql (SqlPersistT)
-import Eventium.ProjectionCache.Sql (ProjectionName, migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
+import Eventium.EventSubscription (CheckpointStore)
+import Eventium.ProjectionCache.Sql (CheckpointName (..), ProjectionName, migrateProjectionSnapshot, sqlCheckpointStore, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
 import Eventium.ProjectionCache.Types (ProjectionCache)
 import Eventium.Store.Class (EventVersion, SequenceNumber)
 import Eventium.Store.Sql.JSONString (JSONString)
@@ -28,3 +31,11 @@ postgresqlGlobalProjectionCache ::
   ProjectionName ->
   ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
 postgresqlGlobalProjectionCache = sqlGlobalProjectionCache
+
+-- | PostgreSQL-backed 'CheckpointStore' for tracking subscription position.
+-- Alias for 'sqlCheckpointStore'.
+postgresqlCheckpointStore ::
+  (MonadIO m) =>
+  CheckpointName ->
+  CheckpointStore (SqlPersistT m) SequenceNumber
+postgresqlCheckpointStore = sqlCheckpointStore

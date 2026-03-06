@@ -35,5 +35,10 @@ data ProjectionCache key position encoded m
 type VersionedProjectionCache encoded m = ProjectionCache UUID EventVersion encoded m
 
 -- | Type synonym for a 'ProjectionCache' that is used in conjunction with a
--- 'GlobalStreamEventStore'.
+-- 'GlobalStreamEventStore'. The key is fixed to @()@ (singleton) because
+-- scoping is handled at construction time via 'ProjectionName' in the SQL
+-- backends, rather than as a runtime parameter on each store\/load call.
+-- The original @eventful@ library kept the key polymorphic
+-- (@GloballyOrderedProjectionCache key serialized m@), but that is redundant
+-- when each cache instance is already scoped by name.
 type GlobalProjectionCache encoded m = ProjectionCache () SequenceNumber encoded m

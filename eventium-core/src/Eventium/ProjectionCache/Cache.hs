@@ -7,11 +7,14 @@ module Eventium.ProjectionCache.Cache
     getLatestGlobalProjectionWithCache,
     updateVersionedProjectionCache,
     updateGlobalProjectionCache,
+    snapshotEventHandler,
+    snapshotGlobalEventHandler,
     module Eventium.ProjectionCache.Types,
   )
 where
 
 import Eventium.Codec
+import Eventium.EventHandler
 import Eventium.Projection
 import Eventium.ProjectionCache.Types
 import Eventium.Store.Class
@@ -106,3 +109,32 @@ updateGlobalProjectionCache ::
 updateGlobalProjectionCache reader cache proj = do
   sp <- getLatestGlobalProjectionWithCache reader cache proj
   cache.storeSnapshot () sp.position sp.state
+
+-- | Creates an 'EventHandler' that updates a 'VersionedProjectionCache'
+-- whenever a versioned stream event is received. Compose with
+-- @synchronousPublisher@ or @publishingEventStoreWriter@ to keep the cache
+-- up to date as events are written.
+snapshotEventHandler ::
+  (Monad m) =>
+  VersionedEventStoreReader m event ->
+  VersionedProjectionCache state m ->
+  Projection state event ->
+  EventHandler m (VersionedStreamEvent event)
+snapshotEventHandler reader cache proj =
+  EventHandler $ \streamEvent -> do
+    let uuid = streamEvent.key
+    updateVersionedProjectionCache reader cache (versionedStreamProjection uuid proj)
+
+-- | Creates an 'EventHandler' that updates a 'GlobalProjectionCache'
+-- whenever a global stream event is received. Compose with
+-- @synchronousPublisher@ or @publishingEventStoreWriter@ to keep the cache
+-- up to date as events are written.
+snapshotGlobalEventHandler ::
+  (Monad m) =>
+  GlobalEventStoreReader m event ->
+  GlobalProjectionCache state m ->
+  Projection state (VersionedStreamEvent event) ->
+  EventHandler m (GlobalStreamEvent event)
+snapshotGlobalEventHandler reader cache proj =
+  EventHandler $ \_ ->
+    updateGlobalProjectionCache reader cache (globalStreamProjection proj)

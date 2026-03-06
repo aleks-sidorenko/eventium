@@ -9,6 +9,7 @@ module Eventium.CommandHandler
   ( CommandHandler (..),
     CommandHandlerError (..),
     applyCommandHandler,
+    applyCommandHandlerWithCache,
     codecCommandHandler,
     embeddedCommandHandler,
   )
@@ -17,6 +18,7 @@ where
 import Control.Exception (throw)
 import Eventium.Codec
 import Eventium.Projection
+import Eventium.ProjectionCache.Cache
 import Eventium.Store.Class
 import Eventium.TypeEmbedding
 import Eventium.UUID
@@ -67,6 +69,32 @@ applyCommandHandler writer reader cmdHandler uuid command = do
       case result of
         Left writeErr -> return $ Left (ConcurrencyConflict writeErr)
         Right _ -> return $ Right events
+
+-- | Like 'applyCommandHandler', but uses a 'VersionedProjectionCache' to load
+-- the latest projection state (falling back to the event store when the cache
+-- is stale or empty). After a successful write, the cache is updated with the
+-- new projection state so subsequent calls can skip replaying events.
+applyCommandHandlerWithCache ::
+  (Monad m) =>
+  VersionedEventStoreWriter m event ->
+  VersionedEventStoreReader m event ->
+  VersionedProjectionCache state m ->
+  CommandHandler state event command err ->
+  UUID ->
+  command ->
+  m (Either (CommandHandlerError err) [event])
+applyCommandHandlerWithCache writer reader cache cmdHandler uuid command = do
+  sp <- getLatestVersionedProjectionWithCache reader cache (versionedStreamProjection uuid cmdHandler.projection)
+  case cmdHandler.decide sp.state command of
+    Left err -> return $ Left (CommandRejected err)
+    Right events -> do
+      result <- writer.storeEvents uuid (ExactPosition sp.position) events
+      case result of
+        Left writeErr -> return $ Left (ConcurrencyConflict writeErr)
+        Right endVersion -> do
+          let newState = foldl' cmdHandler.projection.eventHandler sp.state events
+          cache.storeSnapshot uuid endVersion newState
+          return $ Right events
 
 -- | Use a pair of 'Codec's to wrap a 'CommandHandler' with event type
 -- @event@ and command type @command@ so it uses the @encodedEvent@ and

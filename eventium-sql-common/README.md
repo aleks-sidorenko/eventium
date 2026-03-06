@@ -38,6 +38,23 @@ non-tagged writer path):
 }
 ```
 
+## Schema
+
+### projection_snapshots
+
+```sql
+CREATE TABLE projection_snapshots (
+    projection_name TEXT    NOT NULL,
+    key             UUID    NOT NULL,
+    position        INTEGER NOT NULL,
+    state           JSONB   NOT NULL,
+    updated_at      TIMESTAMP NOT NULL,
+    PRIMARY KEY (projection_name, key)
+);
+```
+
+Used by both `ProjectionCache` (aggregate snapshots) and `CheckpointStore` (read model checkpoints). `ProjectionName` and `CheckpointName` are distinct newtypes that share this table.
+
 ## Key Exports
 
 | Module | Purpose |
@@ -46,6 +63,7 @@ non-tagged writer path):
 | `Eventium.Store.Sql.Operations` | `SqlEventStoreConfig`, `sqlEventStoreReader`, `sqlGlobalEventStoreReader`, `sqlStoreEvents` |
 | `Eventium.Store.Sql.JSONString` | `JSONString` newtype, `jsonStringCodec` |
 | `Eventium.Store.Sql.Orphans` | `PersistField` instances for `UUID`, `EventVersion`, `SequenceNumber` |
+| `Eventium.ProjectionCache.Sql` | `ProjectionName`, `CheckpointName`, `sqlVersionedProjectionCache`, `sqlGlobalProjectionCache`, `sqlCheckpointStore` |
 
 `SqlEventStoreConfig` is a record that maps between Persistent entities and
 Eventium types. `defaultSqlEventStoreConfig` works out of the box with the

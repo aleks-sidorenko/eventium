@@ -3,6 +3,7 @@ module Eventium.EventSubscriptionSpec (spec) where
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.STM
 import Data.IORef
+import Eventium.CheckpointStore.Memory
 import Eventium.EventHandler
 import Eventium.EventSubscription
 import Eventium.Store.Class
@@ -30,7 +31,7 @@ spec = do
 
       -- Set up checkpoint tracking
       checkpointRef <- newIORef (0 :: SequenceNumber)
-      let cpStore = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
+      let cpStore = ioRefCheckpointStore checkpointRef
 
       -- Set up the subscription with very short poll interval
       let sub = pollingSubscription globalReader cpStore 50
@@ -61,7 +62,7 @@ spec = do
 
       -- Start with checkpoint at 2 (already consumed)
       checkpointRef <- newIORef (2 :: SequenceNumber)
-      let cpStore = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
+      let cpStore = ioRefCheckpointStore checkpointRef
 
       let sub = pollingSubscription globalReader cpStore 50
 

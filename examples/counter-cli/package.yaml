@@ -1,5 +1,5 @@
 name: examples-counter-cli
-version: "0.2.0"
+version: "0.2.1"
 maintainer: Alexander Sidorenko
 synopsis: Example Counter cli application for eventium
 description: |

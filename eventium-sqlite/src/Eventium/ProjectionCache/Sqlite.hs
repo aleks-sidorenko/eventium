@@ -1,6 +1,8 @@
 module Eventium.ProjectionCache.Sqlite
   ( sqliteVersionedProjectionCache,
     sqliteGlobalProjectionCache,
+    sqliteCheckpointStore,
+    CheckpointName (..),
     initializeSqliteProjectionCache,
     migrateProjectionSnapshot,
   )
@@ -9,7 +11,8 @@ where
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Database.Persist.Sql (ConnectionPool, SqlPersistT, runMigrationSilent, runSqlPool)
-import Eventium.ProjectionCache.Sql (ProjectionName, migrateProjectionSnapshot, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
+import Eventium.EventSubscription (CheckpointStore)
+import Eventium.ProjectionCache.Sql (CheckpointName (..), ProjectionName, migrateProjectionSnapshot, sqlCheckpointStore, sqlGlobalProjectionCache, sqlVersionedProjectionCache)
 import Eventium.ProjectionCache.Types (ProjectionCache)
 import Eventium.Store.Class (EventVersion, SequenceNumber)
 import Eventium.Store.Sql.JSONString (JSONString)
@@ -30,6 +33,14 @@ sqliteGlobalProjectionCache ::
   ProjectionName ->
   ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
 sqliteGlobalProjectionCache = sqlGlobalProjectionCache
+
+-- | SQLite-backed 'CheckpointStore' for tracking subscription position.
+-- Alias for 'sqlCheckpointStore'.
+sqliteCheckpointStore ::
+  (MonadIO m) =>
+  CheckpointName ->
+  CheckpointStore (SqlPersistT m) SequenceNumber
+sqliteCheckpointStore = sqlCheckpointStore
 
 -- | Run migrations to create the projection_snapshots table in SQLite.
 -- Mirrors 'initializeSqliteEventStore' from "Eventium.Store.Sqlite".

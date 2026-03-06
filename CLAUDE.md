@@ -50,17 +50,19 @@ Multi-package cabal project (`cabal.project`):
 - **eventium-core** — Abstract interfaces and pure types. Key abstractions:
   - `EventStoreReader`/`EventStoreWriter` — polymorphic over key, position, monad, and event types (uses RankNTypes)
   - `Projection` — pure state machine: seed state + event handler fold
-  - `CommandHandler` — combines a Projection with validation to produce events
+  - `CommandHandler` — combines a Projection with validation to produce events. `applyCommandHandlerWithCache` adds ProjectionCache integration.
+  - `ProjectionCache` — snapshot store for aggregate state (versioned per-entity, or global singleton). Wiring helpers: `snapshotEventHandler`, `snapshotGlobalEventHandler`.
+  - `ReadModel` — abstraction for queryable persistent views driven by the global event stream. Bundles initialization, event handling, checkpointing, and reset. Combinators: `runReadModel`, `rebuildReadModel`, `combineReadModels`.
   - `ProcessManager`, `EventSubscription`, `EventPublisher` — orchestration primitives
   - `Codec` — bidirectional event encoding/decoding (encode/decode)
   - `TypeEmbedding` — sum-type subset relationships (embed/extract)
   - `Eventium.TH` — Template Haskell codegen for projections, sum-type codecs, embeddings, and sum-type construction
 - **eventium-memory** — STM-based in-memory `EventStoreReader`/`Writer` and `ProjectionCache`. Primary backend for tests.
-- **eventium-sql-common** — Shared persistent entity definitions and SQL operations for SQL backends.
+- **eventium-sql-common** — Shared persistent entity definitions and SQL operations for SQL backends. Includes `ProjectionName`, `CheckpointName`, `sqlCheckpointStore`, and projection snapshot storage.
 - **eventium-postgresql** — PostgreSQL backend via `persistent`/`persistent-postgresql`.
 - **eventium-sqlite** — SQLite backend via `persistent`/`persistent-sqlite`.
 - **eventium-testkit** — Shared hspec test utilities used across all packages.
-- **examples/{bank,cafe,counter-cli}** — Example applications demonstrating aggregates, command handlers, process managers, and read models.
+- **examples/{bank,cafe,counter-cli}** — Example applications demonstrating aggregates, command handlers, process managers, and read models. The bank example includes a Transfer ReadModel demonstrating queryable persistent views.
 
 ## Testing Conventions
 

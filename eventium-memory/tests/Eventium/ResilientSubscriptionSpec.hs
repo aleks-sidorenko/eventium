@@ -6,6 +6,7 @@ import Control.Exception (IOException, throwIO)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Eventium
+import Eventium.CheckpointStore.Memory
 import Eventium.Store.Memory
 import Test.Hspec
 
@@ -29,7 +30,7 @@ spec = describe "resilientPollingSubscription" $ do
               else globalReader.getEvents range
 
     checkpointRef <- newIORef (0 :: SequenceNumber)
-    let checkpoint = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
+    let checkpoint = ioRefCheckpointStore checkpointRef
 
     deliveredRef <- newIORef ([] :: [Int])
     let handler = EventHandler $ \ge ->
@@ -59,7 +60,7 @@ spec = describe "resilientPollingSubscription" $ do
             liftIO $ throwIO (userError "fatal error" :: IOException)
 
     checkpointRef <- newIORef (0 :: SequenceNumber)
-    let checkpoint = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
+    let checkpoint = ioRefCheckpointStore checkpointRef
 
     let config =
           defaultRetryConfig
@@ -87,7 +88,7 @@ spec = describe "resilientPollingSubscription" $ do
                 fallbackReader.getEvents (allEvents ())
 
     checkpointRef <- newIORef (0 :: SequenceNumber)
-    let checkpoint = CheckpointStore (readIORef checkpointRef) (writeIORef checkpointRef)
+    let checkpoint = ioRefCheckpointStore checkpointRef
 
     callbackCounts <- newIORef ([] :: [Int])
     let config =

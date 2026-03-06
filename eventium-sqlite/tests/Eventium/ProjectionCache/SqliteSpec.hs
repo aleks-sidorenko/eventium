@@ -17,6 +17,9 @@ spec = do
   describe "SQLite global projection cache" $ do
     globalProjectionCacheSpec sqliteGlobalProjectionCacheRunner
 
+  describe "SQLite checkpoint store" $ do
+    checkpointStoreSpec sqliteCheckpointStoreRunner
+
 makeStore ::
   IO
     ( VersionedEventStoreWriter (SqlPersistT IO) CounterEvent,
@@ -49,3 +52,8 @@ sqliteGlobalProjectionCacheRunner = GlobalProjectionCacheRunner $ \action -> do
         codecProjectionCache jsonStringCodec $
           sqliteGlobalProjectionCache (ProjectionName "test_global")
   runSqlPool (action writer globalReader cache) pool
+
+sqliteCheckpointStoreRunner :: CheckpointStoreRunner (SqlPersistT IO)
+sqliteCheckpointStoreRunner = CheckpointStoreRunner $ \action -> do
+  (_, _, pool) <- makeStore
+  runSqlPool (action (sqliteCheckpointStore (CheckpointName "test_checkpoint"))) pool

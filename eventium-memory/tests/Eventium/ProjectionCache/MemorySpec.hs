@@ -13,6 +13,9 @@ spec = do
   describe "TVar projection cache" $ do
     versionedProjectionCacheSpec tvarVersionedProjectionCacheRunner
     globalProjectionCacheSpec tvarGlobalProjectionCacheRunner
+    describe "snapshotEventHandler" $ snapshotEventHandlerSpec tvarVersionedProjectionCacheRunner
+    describe "snapshotGlobalEventHandler" $ snapshotGlobalEventHandlerSpec tvarGlobalProjectionCacheRunner
+    describe "applyCommandHandlerWithCache" $ applyCommandHandlerWithCacheSpec tvarVersionedProjectionCacheRunner
 
   describe "MonadState embedded memory projection cache" $ do
     versionedProjectionCacheSpec stateVersionedProjectionCacheRunner

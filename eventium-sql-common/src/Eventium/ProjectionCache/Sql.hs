@@ -5,7 +5,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -14,32 +13,43 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module Eventium.ProjectionCache.Sql
   ( ProjectionName (..),
+    CheckpointName (..),
     ProjectionSnapshotEntity (..),
     migrateProjectionSnapshot,
     sqlVersionedProjectionCache,
     sqlGlobalProjectionCache,
+    sqlCheckpointStore,
   )
 where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON, ToJSON, Value (Object))
 import Data.Text (Text)
 import Data.Time (UTCTime, getCurrentTime)
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
+import Eventium.EventSubscription (CheckpointStore (..))
 import Eventium.ProjectionCache.Types
 import Eventium.Store.Class (EventVersion (..), SequenceNumber (..))
-import Eventium.Store.Sql.JSONString (JSONString)
+import Eventium.Store.Sql.JSONString (JSONString, encodeJSON)
 import Eventium.Store.Sql.Orphans ()
 import Eventium.UUID (UUID, nil)
 
 -- | A name identifying a projection in the projection cache.
 -- Used as a discriminator so multiple projections can share one storage table.
 newtype ProjectionName = ProjectionName Text
+  deriving (Show, Read, Eq, Ord, ToJSON, FromJSON, PersistField, PersistFieldSql)
+
+-- | A name identifying a checkpoint in the projection snapshots table.
+-- Distinct from 'ProjectionName' to maintain semantic clarity — checkpoint
+-- stores track subscription position, while projection caches store
+-- aggregate snapshots.
+newtype CheckpointName = CheckpointName Text
   deriving (Show, Read, Eq, Ord, ToJSON, FromJSON, PersistField, PersistFieldSql)
 
 share
@@ -110,3 +120,31 @@ sqlGlobalProjectionCache name =
         mEntity <- get (ProjectionSnapshotEntityKey name nil)
         return $ fmap (\e -> (SequenceNumber e.position, e.state)) mEntity
     }
+
+-- | A SQL-backed 'CheckpointStore' for tracking 'SequenceNumber' position.
+--
+-- Reuses the @projection_snapshots@ table. Stores one row with the
+-- 'CheckpointName' as the projection name and 'nil' UUID as the entity key.
+-- The @position@ column stores the sequence number; the @state@ column
+-- stores an empty JSON string.
+sqlCheckpointStore ::
+  (MonadIO m) =>
+  CheckpointName ->
+  CheckpointStore (SqlPersistT m) SequenceNumber
+sqlCheckpointStore (CheckpointName name) =
+  let projName = ProjectionName name
+   in CheckpointStore
+        { getCheckpoint = do
+            mEntity <- get (ProjectionSnapshotEntityKey projName nil)
+            return $ maybe 0 (SequenceNumber . (.position)) mEntity,
+          saveCheckpoint = \(SequenceNumber sn) -> do
+            now <- liftIO getCurrentTime
+            repsert (ProjectionSnapshotEntityKey projName nil) $
+              ProjectionSnapshotEntity
+                { projectionName = projName,
+                  entityId = nil,
+                  position = sn,
+                  state = encodeJSON (Object mempty),
+                  updatedAt = now
+                }
+        }

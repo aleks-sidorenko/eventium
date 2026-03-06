@@ -1,5 +1,10 @@
 # eventium-sqlite Changelog
 
+## 0.2.1 (Unreleased)
+
+- `sqliteCheckpointStore` -- SQLite-backed `CheckpointStore` for `SequenceNumber` tracking.
+- Re-exports `CheckpointName` from `eventium-sql-common`.
+
 ## 0.2.0 (Unreleased)
 
 - Updated for eventium-core 0.2.0 API changes.

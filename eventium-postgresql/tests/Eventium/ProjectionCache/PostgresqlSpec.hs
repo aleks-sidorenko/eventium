@@ -20,6 +20,9 @@ spec = do
   describe "PostgreSQL global projection cache" $ do
     globalProjectionCacheSpec postgresGlobalProjectionCacheRunner
 
+  describe "PostgreSQL checkpoint store" $ do
+    checkpointStoreSpec postgresCheckpointStoreRunner
+
 makePool :: IO ConnectionPool
 makePool = do
   let makeConnString host port user pass db =
@@ -82,3 +85,8 @@ postgresGlobalProjectionCacheRunner = GlobalProjectionCacheRunner $ \action -> d
         codecProjectionCache jsonStringCodec $
           postgresqlGlobalProjectionCache (ProjectionName "test_global")
   runSqlPool (action writer globalReader cache) pool
+
+postgresCheckpointStoreRunner :: CheckpointStoreRunner (SqlPersistT IO)
+postgresCheckpointStoreRunner = CheckpointStoreRunner $ \action -> do
+  pool <- makePool
+  runSqlPool (action (postgresqlCheckpointStore (CheckpointName "test_checkpoint"))) pool

@@ -85,6 +85,43 @@ Routes commands to aggregates and reports outcomes. Construct with `mkCommandDis
 
 `processManagerEventHandler` wires a `ProcessManager` to a global reader and dispatcher, producing a ready-to-use `EventHandler`.
 
+### ProjectionCache
+
+```haskell
+data ProjectionCache key position encoded m = ProjectionCache
+  { storeSnapshot :: key -> position -> encoded -> m ()
+  , loadSnapshot  :: key -> m (Maybe (position, encoded))
+  }
+```
+
+Snapshot store for aggregate state, avoiding full event replay on every load. Two flavors:
+
+- **VersionedProjectionCache** -- keyed by `UUID` + `EventVersion`, one snapshot per aggregate instance.
+- **GlobalProjectionCache** -- keyed by `()` + `SequenceNumber`, singleton snapshot for global projections.
+
+Wiring helpers:
+
+- `snapshotEventHandler` -- `EventHandler` that auto-updates a `VersionedProjectionCache` on each event. Compose with `publishingEventStoreWriter` for transparent snapshotting.
+- `snapshotGlobalEventHandler` -- same for `GlobalProjectionCache`.
+- `applyCommandHandlerWithCache` -- like `applyCommandHandler` but loads from cache and updates after write.
+
+### ReadModel
+
+```haskell
+data ReadModel m event = ReadModel
+  { initialize     :: m ()
+  , eventHandler   :: EventHandler m (GlobalStreamEvent event)
+  , checkpointStore :: CheckpointStore m SequenceNumber
+  , reset          :: m ()
+  }
+```
+
+Abstraction for queryable persistent views driven by the global event stream. Users define their own schema and event handler; the library manages the event pipeline and checkpointing. ReadModels always consume the global stream (cross-aggregate views need total ordering).
+
+- `runReadModel` -- polling subscription that keeps the view updated (runs forever).
+- `rebuildReadModel` -- reset + replay all events (one-shot rebuild).
+- `combineReadModels` -- fan-out events to multiple read models.
+
 ### EventHandler / EventPublisher / EventSubscription
 
 - **EventHandler** -- composable event consumer (`Contravariant`, `Semigroup`, `Monoid`).
@@ -121,16 +158,18 @@ Embeds one sum type into another (e.g. aggregate events into an application-wide
 | `Eventium.Store.Types` | `StreamEvent`, `EventMetadata`, `EventVersion`, `SequenceNumber`, `ExpectedPosition` |
 | `Eventium.Store.Queries` | `QueryRange` builders (`allEvents`, `eventsStartingAt`, etc.) |
 | `Eventium.Projection` | `Projection`, `StreamProjection`, `getLatestStreamProjection` |
-| `Eventium.CommandHandler` | `CommandHandler`, `applyCommandHandler` |
+| `Eventium.CommandHandler` | `CommandHandler`, `applyCommandHandler`, `applyCommandHandlerWithCache` |
 | `Eventium.ProcessManager` | `ProcessManager`, `ProcessManagerEffect`, `CommandDispatcher`, `CommandDispatchResult`, `runProcessManagerEffects`, `processManagerEventHandler` |
 | `Eventium.CommandDispatcher` | `AggregateHandler`, `mkAggregateHandler`, `commandHandlerDispatcher` |
 | `Eventium.EventHandler` | `EventHandler`, `handleEvents` |
 | `Eventium.EventPublisher` | `EventPublisher`, `publishingEventStoreWriter`, `synchronousPublisher` |
 | `Eventium.EventSubscription` | `EventSubscription`, `pollingSubscription`, `CheckpointStore` |
+| `Eventium.ReadModel` | `ReadModel`, `runReadModel`, `rebuildReadModel`, `combineReadModels` |
+| `Eventium.ProjectionCache.Cache` | `ProjectionCache` helpers: `snapshotEventHandler`, `snapshotGlobalEventHandler`, `getLatestVersionedProjectionWithCache`, `updateVersionedProjectionCache` |
+| `Eventium.ProjectionCache.Types` | `ProjectionCache`, `VersionedProjectionCache`, `GlobalProjectionCache` |
 | `Eventium.Codec` | `Codec`, `jsonCodec`, `jsonTextCodec`, `composeCodecs` |
 | `Eventium.UUID` | UUID utilities (`uuidNextRandom`, `uuidFromText`, `uuidFromInteger`) |
 | `Eventium.TH` | Template Haskell: `deriveJSON`, `mkSumTypeCodec`, `mkSumTypeEmbedding`, `makeProjection` |
-| `Eventium.ProjectionCache.Types` | Projection cache interface |
 
 ## Usage
 

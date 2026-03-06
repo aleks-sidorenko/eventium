@@ -62,8 +62,10 @@ main = do
 ## Key Abstractions
 
 - **Projection** -- Pure fold: seed state + event handler. Rebuilds aggregate or read-model state from events.
-- **CommandHandler** -- Validates a command against current state and produces events or a domain error.
+- **CommandHandler** -- Validates a command against current state and produces events or a domain error. `applyCommandHandlerWithCache` integrates with `ProjectionCache` for faster aggregate loading.
 - **EventStoreReader / EventStoreWriter** -- Polymorphic over key, position, monad, and event types. Supports versioned (per-aggregate) and global (cross-aggregate) streams.
+- **ProjectionCache** -- Snapshot store for aggregate state, avoiding full event replay. `snapshotEventHandler` auto-updates the cache as events are written.
+- **ReadModel** -- Abstraction for queryable persistent views driven by the global event stream. Users define schema and event handlers; the library manages checkpointing. `rebuildReadModel` replays all events for one-shot rebuilds.
 - **ProcessManager** -- Coordinates long-running workflows across aggregates. Reacts to events with pure `[ProcessManagerEffect]` values (including `IssueCommandWithCompensation` for saga compensation).
 - **CommandDispatcher** -- Routes commands to aggregates and reports `CommandDispatchResult` (`CommandSucceeded` | `CommandFailed`). `commandHandlerDispatcher` provides list-based multi-aggregate routing.
 - **EventHandler** -- Composable event consumer with `Contravariant`, `Semigroup`, and `Monoid` instances.
