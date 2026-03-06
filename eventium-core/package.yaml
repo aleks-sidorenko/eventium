@@ -1,5 +1,5 @@
 name: eventium-core
-version: "0.2.0"
+version: "0.2.1"
 maintainer: Alexander Sidorenko
 synopsis: Core module for eventium
 description: |

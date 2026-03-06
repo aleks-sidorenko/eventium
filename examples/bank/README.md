@@ -68,12 +68,21 @@ The event handler prints events and triggers the transfer process manager via
 
 ### Read Models
 
-`CustomerAccounts` -- denormalized view matching customers to their accounts.
+**CustomerAccounts** -- in-memory denormalized view matching customers to their accounts.
 Handles `StreamEvent` with 4-field pattern matching:
 
 ```haskell
 handleEvent accounts (StreamEvent uuid _ _ (CustomerCreatedEvent ...)) = ...
 ```
+
+**Transfers** -- persistent queryable view using the `ReadModel` abstraction. Tracks
+transfer lifecycle (Pending → Completed/Failed) in a SQLite `transfers` table. Demonstrates:
+
+- Persistent entity definition for user-defined schema
+- `EventHandler` that writes to SQL on each event
+- `CheckpointStore` via `sqliteCheckpointStore` for tracking position
+- `rebuildReadModel` for replaying all events into the view
+- Query functions (`getTransfersByStatus`) for reading the view
 
 ## Architecture
 
@@ -105,7 +114,8 @@ examples/bank/
     ProcessManagers/
       TransferManager.hs -- pure process manager with ProcessManagerEffect
     ReadModels/
-      CustomerAccounts.hs -- denormalized read model
+      CustomerAccounts.hs -- in-memory denormalized read model
+      Transfers.hs       -- persistent queryable transfer view (ReadModel)
     CLI/
       Options.hs         -- optparse-applicative
       RunCommand.hs      -- command dispatch
@@ -113,8 +123,9 @@ examples/bank/
     Models.hs            -- combined BankEvent/BankCommand, TH-generated codecs
     CLI.hs               -- top-level CLI
     Json.hs              -- JSON helpers
-  tests/Bank/Models/
-    AccountSpec.hs       -- command handler tests using decide
+  tests/Bank/
+    Models/AccountSpec.hs          -- command handler tests using decide
+    ReadModels/TransfersSpec.hs    -- transfer read model lifecycle tests
 ```
 
 ## Testing

@@ -3,6 +3,7 @@ module Eventium.Store.Sql
   )
 where
 
+import Eventium.ProjectionCache.Sql as X
 import Eventium.Store.Sql.DefaultEntity as X
 import Eventium.Store.Sql.JSONString as X
 import Eventium.Store.Sql.Operations as X

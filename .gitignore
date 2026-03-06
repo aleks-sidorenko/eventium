@@ -1,3 +1,4 @@
+# Cabal
 /.cabal-sandbox/
 /.hpc/
 /cabal.sandbox.config

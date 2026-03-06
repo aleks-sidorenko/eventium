@@ -12,11 +12,14 @@ spec :: Spec
 spec = do
   describe "TVar projection cache" $ do
     versionedProjectionCacheSpec tvarVersionedProjectionCacheRunner
-    globalStreamProjectionCacheSpec tvarGlobalStreamProjectionCacheRunner
+    globalProjectionCacheSpec tvarGlobalProjectionCacheRunner
+    describe "snapshotEventHandler" $ snapshotEventHandlerSpec tvarVersionedProjectionCacheRunner
+    describe "snapshotGlobalEventHandler" $ snapshotGlobalEventHandlerSpec tvarGlobalProjectionCacheRunner
+    describe "applyCommandHandlerWithCache" $ applyCommandHandlerWithCacheSpec tvarVersionedProjectionCacheRunner
 
   describe "MonadState embedded memory projection cache" $ do
     versionedProjectionCacheSpec stateVersionedProjectionCacheRunner
-    globalStreamProjectionCacheSpec stateGlobalStreamProjectionCacheRunner
+    globalProjectionCacheSpec stateGlobalProjectionCacheRunner
 
 tvarVersionedProjectionCacheRunner :: VersionedProjectionCacheRunner STM
 tvarVersionedProjectionCacheRunner = VersionedProjectionCacheRunner $ \action -> do
@@ -27,8 +30,8 @@ tvarVersionedProjectionCacheRunner = VersionedProjectionCacheRunner $ \action ->
       cache = tvarProjectionCache projTVar
   atomically $ action writer reader cache
 
-tvarGlobalStreamProjectionCacheRunner :: GlobalStreamProjectionCacheRunner STM
-tvarGlobalStreamProjectionCacheRunner = GlobalStreamProjectionCacheRunner $ \action -> do
+tvarGlobalProjectionCacheRunner :: GlobalProjectionCacheRunner STM
+tvarGlobalProjectionCacheRunner = GlobalProjectionCacheRunner $ \action -> do
   eventTVar <- eventMapTVar
   projTVar <- projectionMapTVar
   let writer = tvarEventStoreWriter eventTVar
@@ -43,9 +46,9 @@ stateVersionedProjectionCacheRunner = VersionedProjectionCacheRunner $ \action -
     reader = embeddedStateEventStoreReader (.eventMap)
     cache = embeddedStateProjectionCache (.projectionMap) setProjectionMap
 
-stateGlobalStreamProjectionCacheRunner :: GlobalStreamProjectionCacheRunner (StateT (GlobalStreamEmbeddedState Counter CounterEvent Text) IO)
-stateGlobalStreamProjectionCacheRunner =
-  GlobalStreamProjectionCacheRunner $ \action -> evalStateT (action writer globalReader cache) emptyEmbeddedState
+stateGlobalProjectionCacheRunner :: GlobalProjectionCacheRunner (StateT (GlobalEmbeddedState Counter CounterEvent) IO)
+stateGlobalProjectionCacheRunner =
+  GlobalProjectionCacheRunner $ \action -> evalStateT (action writer globalReader cache) emptyEmbeddedState
   where
     writer = embeddedStateEventStoreWriter (.eventMap) setEventMap
     globalReader = embeddedStateGlobalEventStoreReader (.eventMap)

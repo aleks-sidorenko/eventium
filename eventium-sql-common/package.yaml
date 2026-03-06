@@ -1,5 +1,5 @@
 name: eventium-sql-common
-version: "0.2.0"
+version: "0.2.1"
 maintainer: Alexander Sidorenko
 synopsis: Common library for SQL event stores
 description: |

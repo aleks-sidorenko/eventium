@@ -11,6 +11,7 @@ module Eventium.Testkit
     CounterCommandHandler,
     CounterCommandError (..),
     counterCommandHandler,
+    counterGlobalProjection,
     CounterEvent (..),
     CounterCommand (..),
     allCommandHandlerStates,
@@ -20,8 +21,13 @@ module Eventium.Testkit
     globalStreamEventStoreSpec,
     VersionedProjectionCacheRunner (..),
     versionedProjectionCacheSpec,
-    GlobalStreamProjectionCacheRunner (..),
-    globalStreamProjectionCacheSpec,
+    GlobalProjectionCacheRunner (..),
+    globalProjectionCacheSpec,
+    CheckpointStoreRunner (..),
+    checkpointStoreSpec,
+    snapshotEventHandlerSpec,
+    snapshotGlobalEventHandlerSpec,
+    applyCommandHandlerWithCacheSpec,
     Text,
     module X,
   )
@@ -339,8 +345,8 @@ versionedProjectionCacheSpec (VersionedProjectionCacheRunner withStoreAndCache) 
   context "when the store is empty" $ do
     it "should be able to store and load simple projections" $ do
       snapshot <- withStoreAndCache $ \_ _ cache -> do
-        cache.storeProjectionSnapshot nil 4 (Counter 100)
-        cache.loadProjectionSnapshot nil
+        cache.storeSnapshot nil 4 (Counter 100)
+        cache.loadSnapshot nil
       snapshot `shouldBe` Just (4, Counter 100)
 
   context "when the store has some events in one stream" $ do
@@ -351,51 +357,51 @@ versionedProjectionCacheSpec (VersionedProjectionCacheRunner withStoreAndCache) 
       snapshot.position `shouldBe` 1
       snapshot.state `shouldBe` Counter 3
 
-    it "should work with updateProjectionCache" $ do
+    it "should work with updateVersionedProjectionCache" $ do
       snapshot <- withStoreAndCache $ \writer reader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2, Added 3]
-        updateProjectionCache reader cache (versionedStreamProjection nil counterProjection)
+        updateVersionedProjectionCache reader cache (versionedStreamProjection nil counterProjection)
         getLatestVersionedProjectionWithCache reader cache (versionedStreamProjection nil counterProjection)
       snapshot.key `shouldBe` nil
       snapshot.position `shouldBe` 2
       snapshot.state `shouldBe` Counter 6
 
-newtype GlobalStreamProjectionCacheRunner m
-  = GlobalStreamProjectionCacheRunner
+newtype GlobalProjectionCacheRunner m
+  = GlobalProjectionCacheRunner
       ( forall a.
         ( VersionedEventStoreWriter m CounterEvent ->
           GlobalEventStoreReader m CounterEvent ->
-          GlobalStreamProjectionCache Text Counter m ->
+          GlobalProjectionCache Counter m ->
           m a
         ) ->
         IO a
       )
 
-globalStreamProjectionCacheSpec ::
+globalProjectionCacheSpec ::
   (Monad m) =>
-  GlobalStreamProjectionCacheRunner m ->
+  GlobalProjectionCacheRunner m ->
   Spec
-globalStreamProjectionCacheSpec (GlobalStreamProjectionCacheRunner withStoreAndCache) = do
+globalProjectionCacheSpec (GlobalProjectionCacheRunner withStoreAndCache) = do
   context "when the store is empty" $ do
     it "should be able to store and load simple projections" $ do
       snapshot <- withStoreAndCache $ \_ _ cache -> do
-        cache.storeProjectionSnapshot "key" 4 (Counter 100)
-        cache.loadProjectionSnapshot "key"
+        cache.storeSnapshot () 4 (Counter 100)
+        cache.loadSnapshot ()
       snapshot `shouldBe` Just (4, Counter 100)
 
   context "when the store has some events in one stream" $ do
     it "should load from a global stream of events" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2]
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 2
       snapshot.state `shouldBe` Counter 3
 
     it "should work with updateGlobalProjectionCache" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         _ <- writer.storeEvents nil AnyPosition [Added 1, Added 2, Added 3]
-        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection)
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 3
       snapshot.state `shouldBe` Counter 6
 
@@ -403,7 +409,119 @@ globalStreamProjectionCacheSpec (GlobalStreamProjectionCacheRunner withStoreAndC
     it "should have the correct cached projection value" $ do
       snapshot <- withStoreAndCache $ \writer globalReader cache -> do
         insertExampleEvents writer
-        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
-        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection) "key"
+        updateGlobalProjectionCache globalReader cache (globalStreamProjection counterGlobalProjection)
+        getLatestGlobalProjectionWithCache globalReader cache (globalStreamProjection counterGlobalProjection)
       snapshot.position `shouldBe` 5
       snapshot.state `shouldBe` Counter 15
+
+newtype CheckpointStoreRunner m
+  = CheckpointStoreRunner
+      ( forall a.
+        ( CheckpointStore m SequenceNumber ->
+          m a
+        ) ->
+        IO a
+      )
+
+checkpointStoreSpec ::
+  (Monad m) =>
+  CheckpointStoreRunner m ->
+  Spec
+checkpointStoreSpec (CheckpointStoreRunner withCheckpoint) = do
+  it "should return 0 when no checkpoint exists" $ do
+    pos <- withCheckpoint $ \cs -> cs.getCheckpoint
+    pos `shouldBe` 0
+
+  it "should store and retrieve a checkpoint" $ do
+    pos <- withCheckpoint $ \cs -> do
+      cs.saveCheckpoint 42
+      cs.getCheckpoint
+    pos `shouldBe` 42
+
+  it "should update an existing checkpoint" $ do
+    pos <- withCheckpoint $ \cs -> do
+      cs.saveCheckpoint 10
+      cs.saveCheckpoint 20
+      cs.getCheckpoint
+    pos `shouldBe` 20
+
+snapshotEventHandlerSpec ::
+  (Monad m) =>
+  VersionedProjectionCacheRunner m ->
+  Spec
+snapshotEventHandlerSpec (VersionedProjectionCacheRunner withStoreAndCache) = do
+  it "should update cache when handling events via publisher" $ do
+    snapshot <- withStoreAndCache $ \writer reader cache -> do
+      let handler = snapshotEventHandler reader cache counterProjection
+          publisher = synchronousPublisher handler
+          pubWriter = publishingEventStoreWriter writer publisher
+      _ <- pubWriter.storeEvents uuid1 NoStream [Added 1, Added 2]
+      cache.loadSnapshot uuid1
+    snapshot `shouldBe` Just (1, Counter 3)
+
+  it "should handle events for multiple aggregates" $ do
+    (snap1, snap2) <- withStoreAndCache $ \writer reader cache -> do
+      let handler = snapshotEventHandler reader cache counterProjection
+          publisher = synchronousPublisher handler
+          pubWriter = publishingEventStoreWriter writer publisher
+      _ <- pubWriter.storeEvents uuid1 NoStream [Added 1, Added 2]
+      _ <- pubWriter.storeEvents uuid2 NoStream [Added 10]
+      s1 <- cache.loadSnapshot uuid1
+      s2 <- cache.loadSnapshot uuid2
+      return (s1, s2)
+    snap1 `shouldBe` Just (1, Counter 3)
+    snap2 `shouldBe` Just (0, Counter 10)
+
+snapshotGlobalEventHandlerSpec ::
+  (Monad m) =>
+  GlobalProjectionCacheRunner m ->
+  Spec
+snapshotGlobalEventHandlerSpec (GlobalProjectionCacheRunner withStoreAndCache) = do
+  it "should update global cache when handling events" $ do
+    snapshot <- withStoreAndCache $ \writer globalReader cache -> do
+      let handler = snapshotGlobalEventHandler globalReader cache counterGlobalProjection
+      _ <- writer.storeEvents uuid1 NoStream [Added 1, Added 2]
+      events <- globalReader.getEvents (allEvents ())
+      handleEvents handler events
+      cache.loadSnapshot ()
+    snapshot `shouldBe` Just (2, Counter 3)
+
+  it "should accumulate state across multiple writes" $ do
+    snapshot <- withStoreAndCache $ \writer globalReader cache -> do
+      let handler = snapshotGlobalEventHandler globalReader cache counterGlobalProjection
+      _ <- writer.storeEvents uuid1 NoStream [Added 1, Added 2]
+      _ <- writer.storeEvents uuid2 NoStream [Added 10]
+      events <- globalReader.getEvents (allEvents ())
+      handleEvents handler events
+      cache.loadSnapshot ()
+    snapshot `shouldBe` Just (3, Counter 13)
+
+applyCommandHandlerWithCacheSpec ::
+  (Monad m) =>
+  VersionedProjectionCacheRunner m ->
+  Spec
+applyCommandHandlerWithCacheSpec (VersionedProjectionCacheRunner withStoreAndCache) = do
+  it "should apply a command and update the cache" $ do
+    (result, snapshot) <- withStoreAndCache $ \writer reader cache -> do
+      r <- applyCommandHandlerWithCache writer reader cache counterCommandHandler uuid1 (Increment 5)
+      s <- cache.loadSnapshot uuid1
+      return (r, s)
+    result `shouldBe` Right [Added 5]
+    snapshot `shouldBe` Just (0, Counter 5)
+
+  it "should use cache for subsequent commands" $ do
+    (result, snapshot) <- withStoreAndCache $ \writer reader cache -> do
+      _ <- applyCommandHandlerWithCache writer reader cache counterCommandHandler uuid1 (Increment 5)
+      r <- applyCommandHandlerWithCache writer reader cache counterCommandHandler uuid1 (Increment 3)
+      s <- cache.loadSnapshot uuid1
+      return (r, s)
+    result `shouldBe` Right [Added 3]
+    snapshot `shouldBe` Just (1, Counter 8)
+
+  it "should reject commands and not update cache" $ do
+    (result, snapshot) <- withStoreAndCache $ \writer reader cache -> do
+      r <- applyCommandHandlerWithCache writer reader cache counterCommandHandler uuid1 (Increment 101)
+      s <- cache.loadSnapshot uuid1
+      return (r, s)
+    result `shouldBe` Left (CommandRejected CounterOutOfBounds)
+    snapshot `shouldBe` Nothing

@@ -1,5 +1,16 @@
 # eventium-core Changelog
 
+## 0.2.1 (Unreleased)
+
+### Additions
+
+- `snapshotEventHandler` -- `EventHandler` that auto-updates a `VersionedProjectionCache` on each event.
+- `snapshotGlobalEventHandler` -- same for `GlobalProjectionCache`.
+- `applyCommandHandlerWithCache` -- like `applyCommandHandler` but loads from cache and updates after write.
+- `Eventium.ReadModel` module:
+  - `ReadModel` record type for queryable persistent views driven by the global event stream.
+  - `runReadModel`, `rebuildReadModel`, `combineReadModels` combinators.
+
 ## 0.2.0 (Unreleased)
 
 See the [root changelog](../CHANGELOG.md) for full details.

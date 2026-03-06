@@ -1,7 +1,7 @@
 module MemoryTestImport
   ( EmbeddedState (..),
     StreamEmbeddedState,
-    GlobalStreamEmbeddedState,
+    GlobalEmbeddedState,
     emptyEmbeddedState,
     setEventMap,
     setProjectionMap,
@@ -21,7 +21,7 @@ data EmbeddedState state event key position
 
 type StreamEmbeddedState state event = EmbeddedState state event UUID EventVersion
 
-type GlobalStreamEmbeddedState state event key = EmbeddedState state event key SequenceNumber
+type GlobalEmbeddedState state event = EmbeddedState state event () SequenceNumber
 
 emptyEmbeddedState :: EmbeddedState state event key position
 emptyEmbeddedState = EmbeddedState 100 emptyEventMap emptyProjectionMap

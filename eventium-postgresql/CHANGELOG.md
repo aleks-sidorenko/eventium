@@ -1,5 +1,10 @@
 # eventium-postgresql Changelog
 
+## 0.2.1 (Unreleased)
+
+- `postgresqlCheckpointStore` -- PostgreSQL-backed `CheckpointStore` for `SequenceNumber` tracking.
+- Re-exports `CheckpointName` from `eventium-sql-common`.
+
 ## 0.2.0 (Unreleased)
 
 - Updated for eventium-core 0.2.0 API changes.

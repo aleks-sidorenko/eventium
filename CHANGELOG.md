@@ -1,5 +1,30 @@
 # eventium Changelog
 
+## 0.2.1 (Unreleased)
+
+### Additions
+
+- **ProjectionCache wiring helpers** (`eventium-core`):
+  - `snapshotEventHandler` -- `EventHandler` that auto-updates a `VersionedProjectionCache` on each event. Compose with `publishingEventStoreWriter` for transparent aggregate snapshotting.
+  - `snapshotGlobalEventHandler` -- same for `GlobalProjectionCache`.
+  - `applyCommandHandlerWithCache` -- like `applyCommandHandler` but loads from cache and updates after write.
+- **ReadModel abstraction** (`eventium-core`):
+  - `ReadModel` record type bundling initialization, event handling, checkpointing, and reset for queryable persistent views.
+  - `runReadModel` -- polling subscription that keeps a read model updated (runs forever).
+  - `rebuildReadModel` -- reset + replay all events (one-shot rebuild).
+  - `combineReadModels` -- fan-out events to multiple read models.
+  - ReadModels consume the global event stream exclusively (cross-aggregate views need total ordering).
+- **SQL CheckpointStore** (`eventium-sql-common`):
+  - `CheckpointName` newtype (distinct from `ProjectionName`) for semantic clarity.
+  - `sqlCheckpointStore` -- SQL-backed `CheckpointStore` for `SequenceNumber`, reusing the `projection_snapshots` table.
+- **Backend re-exports**:
+  - `postgresqlCheckpointStore` (`eventium-postgresql`).
+  - `sqliteCheckpointStore` (`eventium-sqlite`).
+- **Transfer ReadModel example** (`examples/bank`):
+  - `Bank.ReadModels.Transfers` -- persistent queryable view tracking transfer lifecycle (Pending/Completed/Failed) in a SQLite `transfers` table.
+  - Query functions: `getTransfersByStatus`.
+  - Demonstrates the full `ReadModel` pattern end-to-end.
+
 ## 0.2.0 (Unreleased)
 
 Major refactoring of the core API.
