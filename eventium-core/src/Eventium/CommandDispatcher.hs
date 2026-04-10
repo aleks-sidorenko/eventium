@@ -14,10 +14,15 @@ module Eventium.CommandDispatcher
   )
 where
 
+import Control.Monad.IO.Class (MonadIO)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
+import Eventium.Codec (Codec)
 import Eventium.CommandHandler (CommandHandler, CommandHandlerError (..), applyCommandHandler)
-import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher, RejectionReason (..), mkCommandDispatcher)
-import Eventium.Store.Class (VersionedEventStoreReader, VersionedEventStoreWriter)
+import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher (..), RejectionReason (..))
+import Eventium.Store.Class (EventStoreWriter, VersionedEventStoreReader, metadataEnrichingEventStoreWriterWithEnricher)
+import Eventium.Store.Types (EventVersion, TaggedEvent)
+import Eventium.UUID (UUID)
 
 -- | An embedded command handler paired with an error formatter.
 --
@@ -45,6 +50,9 @@ mkAggregateHandlerWith fmt h = AggregateHandler h fmt
 
 -- | Build a 'CommandDispatcher' from a list of 'AggregateHandler's.
 --
+-- Accepts a tagged writer and codec; the 'MetadataEnricher' supplied at
+-- dispatch time is applied to create a per-dispatch enriched writer.
+--
 -- Tries each handler in order:
 --
 --   * @Right (e:es)@ — command matched and produced events → 'CommandSucceeded'
@@ -54,19 +62,22 @@ mkAggregateHandlerWith fmt h = AggregateHandler h fmt
 --
 -- If no handler matches (all return @Right []@), reports 'CommandSucceeded' (no-op).
 commandHandlerDispatcher ::
-  (Monad m) =>
-  VersionedEventStoreWriter m event ->
+  (MonadIO m, Typeable event) =>
+  Codec event encoded ->
+  EventStoreWriter UUID EventVersion m (TaggedEvent encoded) ->
   VersionedEventStoreReader m event ->
   [AggregateHandler event command] ->
   CommandDispatcher m command
-commandHandlerDispatcher writer reader handlers =
-  mkCommandDispatcher $ \uuid cmd -> go handlers uuid cmd
+commandHandlerDispatcher codec taggedWriter reader handlers =
+  CommandDispatcher $ \uuid cmd enricher ->
+    let writer = metadataEnrichingEventStoreWriterWithEnricher enricher codec taggedWriter
+     in go handlers writer uuid cmd
   where
-    go [] _ _ = pure CommandSucceeded
-    go (AggregateHandler handler formatErr : rest) uuid cmd = do
+    go [] _ _ _ = pure CommandSucceeded
+    go (AggregateHandler handler formatErr : rest) writer uuid cmd = do
       result <- applyCommandHandler writer reader handler uuid cmd
       case result of
         Right (_ : _) -> pure CommandSucceeded
         Left (CommandRejected err) -> pure (CommandFailed (formatErr err))
         Left (ConcurrencyConflict _) -> pure (CommandFailed "Concurrency conflict")
-        Right [] -> go rest uuid cmd
+        Right [] -> go rest writer uuid cmd

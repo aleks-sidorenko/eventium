@@ -1,5 +1,5 @@
 name: eventium-memory
-version: "0.2.1"
+version: "0.3.0"
 maintainer: Alexander Sidorenko
 synopsis: In-memory implementations for eventium
 description: |
@@ -30,7 +30,7 @@ when:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.2.0 && < 0.3.0
+  - eventium-core >= 0.3.0 && < 0.4.0
   - containers >= 0.6 && < 0.8
   - mtl >= 2.2 && < 2.4
   - safe >= 0.3 && < 0.4
@@ -60,5 +60,6 @@ tests:
       - hspec
       - HUnit
       - eventium-testkit
+      - time
     build-tools:
       - hspec-discover

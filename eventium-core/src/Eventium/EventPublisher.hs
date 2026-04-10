@@ -12,10 +12,12 @@ module Eventium.EventPublisher
   ( EventPublisher (..),
     synchronousPublisher,
     publishingEventStoreWriter,
-    publishingEventStoreWriterTagged,
+    publishingTaggedCodecEventStoreWriter,
   )
 where
 
+import Control.Exception (throw)
+import Eventium.Codec (Codec (..), DecodeError (..))
 import Eventium.EventHandler
 import Eventium.Store.Class
 import Eventium.UUID
@@ -61,14 +63,19 @@ publishingEventStoreWriter (EventStoreWriter write) (EventPublisher publish) =
         return $ Right endVersion
 
 -- | Like 'publishingEventStoreWriter' but for writers that accept
--- 'TaggedEvent's. The metadata from each tagged event is preserved
--- in the 'StreamEvent' wrappers passed to the publisher.
-publishingEventStoreWriterTagged ::
+-- @TaggedEvent encoded@. Each tagged event's payload is decoded through the
+-- supplied 'Codec' before publishing — handlers receive domain events while
+-- the writer stores serialized payloads. Metadata from each 'TaggedEvent' is
+-- preserved in the 'StreamEvent' wrappers passed to the publisher.
+--
+-- Throws 'DecodeError' if any event fails to decode.
+publishingTaggedCodecEventStoreWriter ::
   (Monad m) =>
-  VersionedEventStoreWriter m (TaggedEvent event) ->
+  Codec event encoded ->
+  VersionedEventStoreWriter m (TaggedEvent encoded) ->
   EventPublisher m event ->
-  VersionedEventStoreWriter m (TaggedEvent event)
-publishingEventStoreWriterTagged (EventStoreWriter write) (EventPublisher publish) =
+  VersionedEventStoreWriter m (TaggedEvent encoded)
+publishingTaggedCodecEventStoreWriter codec (EventStoreWriter write) (EventPublisher publish) =
   EventStoreWriter $ \uuid expectedPos taggedEvents -> do
     result <- write uuid expectedPos taggedEvents
     case result of
@@ -77,7 +84,12 @@ publishingEventStoreWriterTagged (EventStoreWriter write) (EventPublisher publis
         let startVersion = endVersion - fromIntegral (length taggedEvents) + 1
             versionedEvents =
               zipWith
-                (\v (TaggedEvent meta e) -> StreamEvent uuid v meta e)
+                ( \v (TaggedEvent meta enc) ->
+                    let event = case codec.decode enc of
+                          Just e -> e
+                          Nothing -> throw $ DecodeError "publishingTaggedCodecEventStoreWriter" "Failed to decode tagged event payload"
+                     in StreamEvent uuid v meta event
+                )
                 [startVersion ..]
                 taggedEvents
         publish uuid versionedEvents

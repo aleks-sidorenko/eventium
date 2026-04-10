@@ -30,8 +30,8 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
-import Eventium.Store.Class (GlobalEventStoreReader)
-import Eventium.Store.Types
+import Eventium.Store.Class (GlobalEventStoreReader, VersionedStreamEvent)
+import Eventium.Store.Types (MetadataEnricher)
 import Eventium.UUID
 
 -- | A 'ProcessManager' manages interaction between event streams. It
@@ -55,24 +55,29 @@ newtype RejectionReason = RejectionReason {unRejectionReason :: Text}
 
 -- | A side effect that a 'ProcessManager' wants to perform. This is a pure
 -- data type — it describes /what/ should happen, not /how/.
+--
+-- Each constructor carries a 'MetadataEnricher' so the saga can inject
+-- application-level metadata (e.g. @occurredAt@) into events produced by the
+-- dispatched command. Use 'id' when no enrichment is needed.
 data ProcessManagerEffect command
   = -- | Issue a command to a specific aggregate (identified by 'UUID').
-    IssueCommand UUID command
+    IssueCommand UUID command MetadataEnricher
   | -- | Issue a command with compensation: if the command fails, execute
     -- the compensation effects produced by the failure handler.
     --
     -- The 'RejectionReason' argument to the compensation function is the failure reason
     -- from 'CommandFailed'.
-    IssueCommandWithCompensation UUID command (RejectionReason -> [ProcessManagerEffect command])
+    IssueCommandWithCompensation UUID command MetadataEnricher (RejectionReason -> [ProcessManagerEffect command])
 
 instance (Show command) => Show (ProcessManagerEffect command) where
-  show (IssueCommand uuid cmd) = "IssueCommand " ++ show uuid ++ " " ++ show cmd
-  show (IssueCommandWithCompensation uuid cmd _) =
+  show (IssueCommand uuid cmd _) = "IssueCommand " ++ show uuid ++ " " ++ show cmd
+  show (IssueCommandWithCompensation uuid cmd _ _) =
     "IssueCommandWithCompensation " ++ show uuid ++ " " ++ show cmd ++ " <compensation>"
 
+-- | Enricher is opaque (a function) — ignored in equality comparisons.
 instance (Eq command) => Eq (ProcessManagerEffect command) where
-  IssueCommand u1 c1 == IssueCommand u2 c2 = u1 == u2 && c1 == c2
-  IssueCommandWithCompensation u1 c1 _ == IssueCommandWithCompensation u2 c2 _ = u1 == u2 && c1 == c2
+  IssueCommand u1 c1 _ == IssueCommand u2 c2 _ = u1 == u2 && c1 == c2
+  IssueCommandWithCompensation u1 c1 _ _ == IssueCommandWithCompensation u2 c2 _ _ = u1 == u2 && c1 == c2
   _ == _ = False
 
 -- | Result of dispatching a command to an aggregate.
@@ -89,22 +94,22 @@ data CommandDispatchResult
 -- Use 'fireAndForgetDispatcher' to adapt a legacy @UUID -> command -> m ()@
 -- callback that does not report failures.
 newtype CommandDispatcher m command = CommandDispatcher
-  { dispatchCommand :: UUID -> command -> m CommandDispatchResult
+  { dispatchCommand :: UUID -> command -> MetadataEnricher -> m CommandDispatchResult
   }
 
 -- | Construct a 'CommandDispatcher' from a dispatch function.
 mkCommandDispatcher ::
-  (UUID -> command -> m CommandDispatchResult) ->
+  (UUID -> command -> MetadataEnricher -> m CommandDispatchResult) ->
   CommandDispatcher m command
 mkCommandDispatcher = CommandDispatcher
 
 -- | Adapt a legacy fire-and-forget dispatcher into a 'CommandDispatcher'
--- that always reports 'CommandSucceeded'.
+-- that always reports 'CommandSucceeded'. The enricher is ignored.
 fireAndForgetDispatcher ::
   (Monad m) =>
   (UUID -> command -> m ()) ->
   CommandDispatcher m command
-fireAndForgetDispatcher f = CommandDispatcher $ \uuid cmd ->
+fireAndForgetDispatcher f = CommandDispatcher $ \uuid cmd _enricher ->
   f uuid cmd >> pure CommandSucceeded
 
 -- | Execute a list of 'ProcessManagerEffect's using the provided
@@ -116,10 +121,10 @@ runProcessManagerEffects ::
   m ()
 runProcessManagerEffects dispatcher = mapM_ go
   where
-    go (IssueCommand uuid cmd) =
-      void $ dispatcher.dispatchCommand uuid cmd
-    go (IssueCommandWithCompensation uuid cmd onFailure) = do
-      result <- dispatcher.dispatchCommand uuid cmd
+    go (IssueCommand uuid cmd enricher) =
+      void $ dispatcher.dispatchCommand uuid cmd enricher
+    go (IssueCommandWithCompensation uuid cmd enricher onFailure) = do
+      result <- dispatcher.dispatchCommand uuid cmd enricher
       case result of
         CommandSucceeded -> pure ()
         CommandFailed reason -> mapM_ go (onFailure reason)
