@@ -127,7 +127,7 @@ data ProcessManager state event command = ProcessManager
 
 data ProcessManagerEffect command
   = IssueCommand UUID command MetadataEnricher
-  | IssueCommandWithCompensation UUID command MetadataEnricher (Text -> [ProcessManagerEffect command])
+  | IssueCommandWithCompensation UUID command MetadataEnricher (RejectionReason -> [ProcessManagerEffect command])
 ```
 
 Coordinates workflows across aggregates. The `react` function is pure -- it
@@ -155,7 +155,8 @@ Use `id` when no enrichment is needed. Compose enrichers with `.`:
 let enricher = \m -> m { occurredAt = Just pastTime }
 
 -- Compose multiple enrichments
-let enricher = setOccurredAt . setCorrelationId
+let enricher = (\m -> m { occurredAt = Just pastTime })
+             . (\m -> m { correlationId = Just corrId })
 ```
 
 The enricher flows through `CommandDispatcher`, `ProcessManagerEffect`, and
