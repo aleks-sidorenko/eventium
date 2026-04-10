@@ -20,6 +20,7 @@ module Eventium.Store.Class
     codecEventStoreWriter,
     metadataEnrichingEventStoreWriter,
     metadataEnrichingEventStoreWriterWithEnricher,
+    codecTaggedEventStoreWriter,
     tagEvents,
 
     -- * Type embedding
@@ -205,6 +206,30 @@ metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter w
             )
             events
     write key pos tagged
+
+-- | Adapt a versioned (domain-event) writer to accept 'TaggedEvent's by
+-- decoding each payload through the supplied 'Codec'.
+--
+-- This is the inverse of 'metadataEnrichingEventStoreWriter': where the
+-- enriching writer encodes domain events into tagged events, this function
+-- decodes tagged events back into domain events before delegating to the
+-- underlying versioned writer.
+--
+-- Use case: you have a 'VersionedEventStoreWriter' wrapped with a
+-- publishing event bus (via 'publishingEventStoreWriter') and need to
+-- expose it as a tagged writer for per-call 'MetadataEnricher' support.
+--
+-- Throws 'DecodeError' if any event fails to decode.
+codecTaggedEventStoreWriter ::
+  (Monad m) =>
+  Codec event encoded ->
+  VersionedEventStoreWriter m event ->
+  EventStoreWriter UUID EventVersion m (TaggedEvent encoded)
+codecTaggedEventStoreWriter codec (EventStoreWriter write) =
+  EventStoreWriter $ \key pos taggedEvents ->
+    case traverse (codec.decode . (.payload)) taggedEvents of
+      Nothing -> throw $ DecodeError "codecTaggedEventStoreWriter" "Failed to decode tagged event payload"
+      Just events -> write key pos events
 
 -- | Tag events with metadata in a pure context. The caller supplies
 -- the current time. Useful when 'MonadIO' is not available.
