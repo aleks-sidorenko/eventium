@@ -12,8 +12,7 @@ module Eventium.EventPublisher
   ( EventPublisher (..),
     synchronousPublisher,
     publishingEventStoreWriter,
-    publishingEventStoreWriterTagged,
-    publishingEventStoreWriterTaggedCodec,
+    publishingTaggedCodecEventStoreWriter,
   )
 where
 
@@ -64,44 +63,19 @@ publishingEventStoreWriter (EventStoreWriter write) (EventPublisher publish) =
         return $ Right endVersion
 
 -- | Like 'publishingEventStoreWriter' but for writers that accept
--- 'TaggedEvent's. The metadata from each tagged event is preserved
--- in the 'StreamEvent' wrappers passed to the publisher.
-publishingEventStoreWriterTagged ::
-  (Monad m) =>
-  VersionedEventStoreWriter m (TaggedEvent event) ->
-  EventPublisher m event ->
-  VersionedEventStoreWriter m (TaggedEvent event)
-publishingEventStoreWriterTagged (EventStoreWriter write) (EventPublisher publish) =
-  EventStoreWriter $ \uuid expectedPos taggedEvents -> do
-    result <- write uuid expectedPos taggedEvents
-    case result of
-      Left err -> return $ Left err
-      Right endVersion -> do
-        let startVersion = endVersion - fromIntegral (length taggedEvents) + 1
-            versionedEvents =
-              zipWith
-                (\v (TaggedEvent meta e) -> StreamEvent uuid v meta e)
-                [startVersion ..]
-                taggedEvents
-        publish uuid versionedEvents
-        return $ Right endVersion
-
--- | Like 'publishingEventStoreWriterTagged' but decodes each tagged event's
--- payload through a 'Codec' before publishing. This lets the writer accept
--- @TaggedEvent encoded@ (e.g. @TaggedEvent JSONString@) while handlers
--- receive decoded domain events.
---
--- Use this when the tagged writer stores serialized payloads but event
--- handlers (read models, process managers) need domain event types.
+-- @TaggedEvent encoded@. Each tagged event's payload is decoded through the
+-- supplied 'Codec' before publishing — handlers receive domain events while
+-- the writer stores serialized payloads. Metadata from each 'TaggedEvent' is
+-- preserved in the 'StreamEvent' wrappers passed to the publisher.
 --
 -- Throws 'DecodeError' if any event fails to decode.
-publishingEventStoreWriterTaggedCodec ::
+publishingTaggedCodecEventStoreWriter ::
   (Monad m) =>
   Codec event encoded ->
   VersionedEventStoreWriter m (TaggedEvent encoded) ->
   EventPublisher m event ->
   VersionedEventStoreWriter m (TaggedEvent encoded)
-publishingEventStoreWriterTaggedCodec codec (EventStoreWriter write) (EventPublisher publish) =
+publishingTaggedCodecEventStoreWriter codec (EventStoreWriter write) (EventPublisher publish) =
   EventStoreWriter $ \uuid expectedPos taggedEvents -> do
     result <- write uuid expectedPos taggedEvents
     case result of
@@ -113,7 +87,7 @@ publishingEventStoreWriterTaggedCodec codec (EventStoreWriter write) (EventPubli
                 ( \v (TaggedEvent meta enc) ->
                     let event = case codec.decode enc of
                           Just e -> e
-                          Nothing -> throw $ DecodeError "publishingEventStoreWriterTaggedCodec" "Failed to decode tagged event payload"
+                          Nothing -> throw $ DecodeError "publishingTaggedCodecEventStoreWriter" "Failed to decode tagged event payload"
                      in StreamEvent uuid v meta event
                 )
                 [startVersion ..]

@@ -77,7 +77,7 @@ spec = describe "Metadata enrichment" $ do
       events <- reader.getEvents (allEvents uuid)
       map (\e -> e.metadata.eventType) events `shouldBe` [""]
 
-  describe "publishingEventStoreWriterTagged" $ do
+  describe "publishingTaggedCodecEventStoreWriter" $ do
     it "propagates metadata to published StreamEvents" $ do
       tvar <- eventMapTVar
       publishedRef <- newIORef []
@@ -85,7 +85,7 @@ spec = describe "Metadata enrichment" $ do
           handler = EventHandler $ \(StreamEvent _ _ meta _) ->
             modifyIORef publishedRef (++ [meta.eventType])
           publisher = synchronousPublisher handler
-          pubWriter = publishingEventStoreWriterTagged taggedWriter publisher
+          pubWriter = publishingTaggedCodecEventStoreWriter testCodec taggedWriter publisher
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec pubWriter
           uuid = uuidFromInteger 1
       _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int, 99]
