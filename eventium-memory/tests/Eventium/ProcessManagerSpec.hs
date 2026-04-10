@@ -178,8 +178,9 @@ spec = do
       runProcessManagerEffects dispatcher effects
 
       dispatched <- readIORef dispatchedRef
-      length dispatched `shouldBe` 1
-      let (_, cmd, enr) = head dispatched
-      cmd `shouldBe` AcceptCredit 50
-      let enriched = enr (emptyMetadata "test")
-      enriched.occurredAt `shouldBe` Just (UTCTime (fromGregorian 2025 3 15) 0)
+      case dispatched of
+        [(_, cmd, enr)] -> do
+          cmd `shouldBe` AcceptCredit 50
+          let enriched = enr (emptyMetadata "test")
+          enriched.occurredAt `shouldBe` Just (UTCTime (fromGregorian 2025 3 15) 0)
+        _ -> expectationFailure "expected exactly one dispatch"

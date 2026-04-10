@@ -172,17 +172,6 @@ codecEventStoreWriter ::
   EventStoreWriter key position m event
 codecEventStoreWriter codec = contramap codec.encode
 
--- | Wraps an 'EventStoreWriter' that accepts 'TaggedEvent's, producing a
--- writer that accepts domain events. Each event is encoded and tagged
--- with metadata (event type name derived from 'Typeable', current
--- UTC timestamp).
---
--- Use this instead of 'codecEventStoreWriter' when you want metadata
--- to be populated. The underlying writer must accept 'TaggedEvent's.
---
--- @
--- writer = metadataEnrichingEventStoreWriter myCodec taggedStore
--- @
 -- | Like 'metadataEnrichingEventStoreWriterWithEnricher' with 'id' as the
 -- enricher — no custom metadata modifications are applied.
 metadataEnrichingEventStoreWriter ::
