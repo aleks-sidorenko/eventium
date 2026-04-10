@@ -60,5 +60,6 @@ tests:
       - hspec
       - HUnit
       - eventium-testkit
+      - time
     build-tools:
       - hspec-discover

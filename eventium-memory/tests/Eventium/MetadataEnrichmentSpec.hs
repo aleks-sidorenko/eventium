@@ -5,6 +5,7 @@ module Eventium.MetadataEnrichmentSpec (spec) where
 import Control.Concurrent.STM
 import Data.IORef
 import Data.Maybe (isJust, isNothing)
+import Data.Time (UTCTime (..), fromGregorian)
 import Eventium
 import Eventium.Store.Memory
 import Test.Hspec
@@ -42,6 +43,29 @@ spec = describe "Metadata enrichment" $ do
       events <- reader.getEvents (allEvents uuid)
       -- occurredAt should be Nothing by default (auto-enrichment doesn't set it)
       all (\e -> isNothing e.metadata.occurredAt) events `shouldBe` True
+
+  describe "metadataEnrichingEventStoreWriterWithEnricher" $ do
+    it "applies MetadataEnricher to set occurredAt" $ do
+      tvar <- eventMapTVar
+      let pastTime = UTCTime (fromGregorian 2025 3 15) 0
+          enricher m = m {occurredAt = Just pastTime}
+          taggedWriter = tvarEventStoreWriterTagged tvar
+          enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher enricher testCodec (runEventStoreWriterUsing atomically taggedWriter)
+          reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
+          uuid = uuidFromInteger 1
+      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
+      events <- reader.getEvents (allEvents uuid)
+      map (\e -> e.metadata.occurredAt) events `shouldBe` [Just pastTime]
+
+    it "id enricher leaves occurredAt as Nothing" $ do
+      tvar <- eventMapTVar
+      let taggedWriter = tvarEventStoreWriterTagged tvar
+          enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher id testCodec (runEventStoreWriterUsing atomically taggedWriter)
+          reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
+          uuid = uuidFromInteger 1
+      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
+      events <- reader.getEvents (allEvents uuid)
+      map (\e -> e.metadata.occurredAt) events `shouldBe` [Nothing]
 
   describe "backward compatibility" $ do
     it "non-tagged writer still uses empty metadata" $ do

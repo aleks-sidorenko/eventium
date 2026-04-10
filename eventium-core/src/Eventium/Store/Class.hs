@@ -19,6 +19,7 @@ module Eventium.Store.Class
     codecGlobalEventStoreReader,
     codecEventStoreWriter,
     metadataEnrichingEventStoreWriter,
+    metadataEnrichingEventStoreWriterWithEnricher,
     tagEvents,
 
     -- * Type embedding
@@ -182,19 +183,35 @@ codecEventStoreWriter codec = contramap codec.encode
 -- @
 -- writer = metadataEnrichingEventStoreWriter myCodec taggedStore
 -- @
+-- | Like 'metadataEnrichingEventStoreWriterWithEnricher' with 'id' as the
+-- enricher — no custom metadata modifications are applied.
 metadataEnrichingEventStoreWriter ::
   (MonadIO m, Typeable event) =>
   Codec event encoded ->
   EventStoreWriter key position m (TaggedEvent encoded) ->
   EventStoreWriter key position m event
-metadataEnrichingEventStoreWriter codec (EventStoreWriter write) =
+metadataEnrichingEventStoreWriter = metadataEnrichingEventStoreWriterWithEnricher id
+
+-- | Wraps an 'EventStoreWriter' that accepts 'TaggedEvent's, producing a
+-- writer that accepts domain events. Each event is encoded and tagged
+-- with metadata (event type name derived from 'Typeable', current
+-- UTC timestamp). The supplied 'MetadataEnricher' is applied to the
+-- generated metadata before writing — use this to inject application-level
+-- fields such as @occurredAt@.
+metadataEnrichingEventStoreWriterWithEnricher ::
+  (MonadIO m, Typeable event) =>
+  MetadataEnricher ->
+  Codec event encoded ->
+  EventStoreWriter key position m (TaggedEvent encoded) ->
+  EventStoreWriter key position m event
+metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter write) =
   EventStoreWriter $ \key pos events -> do
     now <- liftIO getCurrentTime
     let tagged =
           map
             ( \e ->
                 TaggedEvent
-                  (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) Nothing)
+                  (enricher (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) Nothing))
                   (codec.encode e)
             )
             events

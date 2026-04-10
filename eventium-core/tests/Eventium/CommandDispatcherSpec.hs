@@ -3,6 +3,7 @@
 module Eventium.CommandDispatcherSpec (spec) where
 
 import Data.IORef
+import Eventium.Codec
 import Eventium.CommandDispatcher
 import Eventium.CommandHandler
 import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher (..), RejectionReason (..))
@@ -35,20 +36,25 @@ counterHandler = CommandHandler decide' counterProjection
       | otherwise = Right [Decremented]
     decide' _ Unknown = Right []
 
+testCodec :: Codec CounterEvent CounterEvent
+testCodec = Codec id Just
+
 -- | Simple IORef-based event store for testing.
-mkTestStore :: IO (VersionedEventStoreWriter IO CounterEvent, VersionedEventStoreReader IO CounterEvent)
+-- Returns a tagged writer, a reader that reads domain events, and raw reader.
+mkTestStore :: IO (VersionedEventStoreWriter IO (TaggedEvent CounterEvent), VersionedEventStoreReader IO CounterEvent)
 mkTestStore = do
   eventsRef <- newIORef ([] :: [VersionedStreamEvent CounterEvent])
-  let writer = EventStoreWriter $ \uuid _expected events -> do
+  let taggedWriter = EventStoreWriter $ \uuid _expected taggedEvents -> do
         existing <- readIORef eventsRef
-        let startVersion = fromIntegral (length existing)
+        let events = map (.payload) taggedEvents
+            startVersion = fromIntegral (length existing)
             versioned = zipWith (\i e -> StreamEvent uuid i (emptyMetadata "") e) [startVersion ..] events
         modifyIORef eventsRef (++ versioned)
         pure (Right (startVersion + fromIntegral (length events) - 1))
       reader = EventStoreReader $ \query -> do
         allEvts <- readIORef eventsRef
         pure $ filterByQuery query allEvts
-  pure (writer, reader)
+  pure (taggedWriter, reader)
   where
     filterByQuery (QueryRange uuid _ _) =
       filter (\(StreamEvent k _ _ _) -> k == uuid)
@@ -57,30 +63,30 @@ spec :: Spec
 spec = describe "CommandDispatcher" $ do
   describe "commandHandlerDispatcher" $ do
     it "routes command to matching handler and reports success" $ do
-      (writer, reader) <- mkTestStore
+      (taggedWriter, reader) <- mkTestStore
 
       let handlers = [mkAggregateHandler counterHandler]
-          dispatcher = commandHandlerDispatcher writer reader handlers
+          dispatcher = commandHandlerDispatcher testCodec taggedWriter reader handlers
 
-      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Increment
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Increment id
       result `shouldBe` CommandSucceeded
 
     it "reports failure when command is rejected" $ do
-      (writer, reader) <- mkTestStore
+      (taggedWriter, reader) <- mkTestStore
 
       let handlers = [mkAggregateHandler counterHandler]
-          dispatcher = commandHandlerDispatcher writer reader handlers
+          dispatcher = commandHandlerDispatcher testCodec taggedWriter reader handlers
 
       -- Counter starts at 0, Decrement should fail
-      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Decrement
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Decrement id
       result `shouldBe` CommandFailed (RejectionReason "AlreadyZero")
 
     it "returns CommandSucceeded when no handler matches" $ do
-      (writer, reader) <- mkTestStore
+      (taggedWriter, reader) <- mkTestStore
 
       let handlers = [mkAggregateHandler counterHandler]
-          dispatcher = commandHandlerDispatcher writer reader handlers
+          dispatcher = commandHandlerDispatcher testCodec taggedWriter reader handlers
 
       -- Unknown returns Right [], so no handler "matches" (produces events)
-      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Unknown
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Unknown id
       result `shouldBe` CommandSucceeded
