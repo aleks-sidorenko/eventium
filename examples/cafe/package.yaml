@@ -22,8 +22,8 @@ when:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.2.0 && < 0.3.0
-  - eventium-sqlite >= 0.2.0 && < 0.3.0
+  - eventium-core >= 0.3.0 && < 0.4.0
+  - eventium-sqlite >= 0.3.0 && < 0.4.0
 
   - aeson >= 1.5 && < 2.3
   - aeson-pretty >= 0.8 && < 0.9

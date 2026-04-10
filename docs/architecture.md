@@ -34,7 +34,7 @@ data StreamEvent key position event = StreamEvent
 
 - **key** -- identifies the stream (typically `UUID` for aggregates, `()` for the global stream).
 - **position** -- ordering within the stream (`EventVersion` per aggregate, `SequenceNumber` globally).
-- **metadata** -- `EventMetadata` carrying event type name, optional correlation/causation IDs, and timestamp.
+- **metadata** -- `EventMetadata` carrying event type name, optional correlation/causation IDs, timestamp, and optional `occurredAt` for backdated events.
 - **event** -- the domain payload.
 
 Common type aliases:
@@ -126,8 +126,8 @@ data ProcessManager state event command = ProcessManager
   }
 
 data ProcessManagerEffect command
-  = IssueCommand UUID command
-  | IssueCommandWithCompensation UUID command (Text -> [ProcessManagerEffect command])
+  = IssueCommand UUID command MetadataEnricher
+  | IssueCommandWithCompensation UUID command MetadataEnricher (Text -> [ProcessManagerEffect command])
 ```
 
 Coordinates workflows across aggregates. The `react` function is pure -- it
@@ -138,11 +138,35 @@ compensation handler: if the dispatched command fails, the compensation
 function receives the failure reason and produces follow-up effects (e.g.
 rejecting a transfer when the target account refuses a credit).
 
+### MetadataEnricher
+
+```haskell
+type MetadataEnricher = EventMetadata -> EventMetadata
+```
+
+A builder function threaded through the command pipeline to customize event
+metadata at write time. The enricher is applied after base metadata generation
+(`eventType` from `Typeable`, `createdAt` from system clock).
+
+Use `id` when no enrichment is needed. Compose enrichers with `.`:
+
+```haskell
+-- Set occurredAt for backdated events
+let enricher = \m -> m { occurredAt = Just pastTime }
+
+-- Compose multiple enrichments
+let enricher = setOccurredAt . setCorrelationId
+```
+
+The enricher flows through `CommandDispatcher`, `ProcessManagerEffect`, and
+`commandHandlerDispatcher`. `metadataEnrichingEventStoreWriterWithEnricher`
+applies it at the writer level.
+
 ### CommandDispatcher
 
 ```haskell
 newtype CommandDispatcher m command = CommandDispatcher
-  { dispatchCommand :: UUID -> command -> m CommandDispatchResult }
+  { dispatchCommand :: UUID -> command -> MetadataEnricher -> m CommandDispatchResult }
 
 data CommandDispatchResult
   = CommandSucceeded
