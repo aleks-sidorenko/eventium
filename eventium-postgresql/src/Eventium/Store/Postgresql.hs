@@ -5,7 +5,7 @@
 -- | Defines an Postgresql event store.
 module Eventium.Store.Postgresql
   ( postgresqlEventStoreWriter,
-    postgresqlEventStoreWriterTagged,
+    postgresqlTaggedEventStoreWriter,
     module Eventium.Store.Class,
     module Eventium.Store.Sql,
   )
@@ -35,11 +35,11 @@ maxPostgresVersionSql (FieldNameDB tableName) (FieldNameDB uuidFieldName) (Field
 
 -- | Like 'postgresqlEventStoreWriter' but accepts 'TaggedEvent's,
 -- preserving the metadata attached to each event.
-postgresqlEventStoreWriterTagged ::
+postgresqlTaggedEventStoreWriter ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend, SafeToInsert entity) =>
   SqlEventStoreConfig entity serialized ->
   VersionedEventStoreWriter (SqlPersistT m) (TaggedEvent serialized)
-postgresqlEventStoreWriterTagged config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+postgresqlTaggedEventStoreWriter config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
   where
     getLatestVersion = sqlMaxEventVersion config maxPostgresVersionSql
     storeEvents' = sqlStoreEventsTagged config (Just tableLockFunc) maxPostgresVersionSql

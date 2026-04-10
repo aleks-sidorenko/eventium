@@ -15,7 +15,7 @@ spec = describe "Metadata enrichment" $ do
   describe "metadataEnrichingEventStoreWriter" $ do
     it "populates event type name from Typeable" $ do
       tvar <- eventMapTVar
-      let taggedWriter = tvarEventStoreWriterTagged tvar
+      let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
@@ -25,7 +25,7 @@ spec = describe "Metadata enrichment" $ do
 
     it "populates createdAt timestamp" $ do
       tvar <- eventMapTVar
-      let taggedWriter = tvarEventStoreWriterTagged tvar
+      let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
@@ -35,7 +35,7 @@ spec = describe "Metadata enrichment" $ do
 
     it "preserves occurredAt when set via enricher" $ do
       tvar <- eventMapTVar
-      let taggedWriter = tvarEventStoreWriterTagged tvar
+      let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
@@ -49,7 +49,7 @@ spec = describe "Metadata enrichment" $ do
       tvar <- eventMapTVar
       let pastTime = UTCTime (fromGregorian 2025 3 15) 0
           enricher m = m {occurredAt = Just pastTime}
-          taggedWriter = tvarEventStoreWriterTagged tvar
+          taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher enricher testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
@@ -59,7 +59,7 @@ spec = describe "Metadata enrichment" $ do
 
     it "id enricher leaves occurredAt as Nothing" $ do
       tvar <- eventMapTVar
-      let taggedWriter = tvarEventStoreWriterTagged tvar
+      let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher id testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
@@ -81,7 +81,7 @@ spec = describe "Metadata enrichment" $ do
     it "propagates metadata to published StreamEvents" $ do
       tvar <- eventMapTVar
       publishedRef <- newIORef []
-      let taggedWriter = runEventStoreWriterUsing atomically (tvarEventStoreWriterTagged tvar)
+      let taggedWriter = runEventStoreWriterUsing atomically (tvarTaggedEventStoreWriter tvar)
           handler = EventHandler $ \(StreamEvent _ _ meta _) ->
             modifyIORef publishedRef (++ [meta.eventType])
           publisher = synchronousPublisher handler

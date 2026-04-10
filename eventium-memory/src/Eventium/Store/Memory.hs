@@ -4,15 +4,15 @@
 module Eventium.Store.Memory
   ( tvarEventStoreReader,
     tvarEventStoreWriter,
-    tvarEventStoreWriterTagged,
+    tvarTaggedEventStoreWriter,
     tvarGlobalEventStoreReader,
     stateEventStoreReader,
     stateEventStoreWriter,
-    stateEventStoreWriterTagged,
+    stateTaggedEventStoreWriter,
     stateGlobalEventStoreReader,
     embeddedStateEventStoreReader,
     embeddedStateEventStoreWriter,
-    embeddedStateEventStoreWriterTagged,
+    embeddedStateTaggedEventStoreWriter,
     embeddedStateGlobalEventStoreReader,
     EventMap,
     emptyEventMap,
@@ -66,8 +66,8 @@ tvarEventStoreWriter tvar = EventStoreWriter $ transactionalExpectedWriteHelper 
 
 -- | Like 'tvarEventStoreWriter' but accepts 'TaggedEvent's,
 -- preserving the metadata attached to each event.
-tvarEventStoreWriterTagged :: TVar (EventMap event) -> VersionedEventStoreWriter STM (TaggedEvent event)
-tvarEventStoreWriterTagged tvar = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+tvarTaggedEventStoreWriter :: TVar (EventMap event) -> VersionedEventStoreWriter STM (TaggedEvent event)
+tvarTaggedEventStoreWriter tvar = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
   where
     getLatestVersion uuid = flip latestEventVersion uuid <$> readTVar tvar
     storeEvents' uuid events = do
@@ -100,10 +100,10 @@ stateEventStoreWriter ::
 stateEventStoreWriter = embeddedStateEventStoreWriter id (const id)
 
 -- | Like 'stateEventStoreWriter' but accepts 'TaggedEvent's.
-stateEventStoreWriterTagged ::
+stateTaggedEventStoreWriter ::
   (MonadState (EventMap event) m) =>
   VersionedEventStoreWriter m (TaggedEvent event)
-stateEventStoreWriterTagged = embeddedStateEventStoreWriterTagged id (const id)
+stateTaggedEventStoreWriter = embeddedStateTaggedEventStoreWriter id (const id)
 
 -- | An 'EventStore' that runs on some 'MonadState' that contains an
 -- 'EventMap'. This is useful if you want to include other state in your
@@ -137,12 +137,12 @@ embeddedStateGlobalEventStoreReader ::
 embeddedStateGlobalEventStoreReader getMap = EventStoreReader $ \range -> lookupGlobalEvents range <$> gets getMap
 
 -- | Like 'embeddedStateEventStoreWriter' but accepts 'TaggedEvent's.
-embeddedStateEventStoreWriterTagged ::
+embeddedStateTaggedEventStoreWriter ::
   (MonadState s m) =>
   (s -> EventMap event) ->
   (s -> EventMap event -> s) ->
   VersionedEventStoreWriter m (TaggedEvent event)
-embeddedStateEventStoreWriterTagged getMap setMap = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+embeddedStateTaggedEventStoreWriter getMap setMap = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
   where
     getLatestVersion uuid = flip latestEventVersion uuid <$> gets getMap
     storeEvents' uuid events = do

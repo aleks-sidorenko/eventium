@@ -30,7 +30,7 @@ cliEventStoreWriter :: (MonadIO m) => VersionedEventStoreWriter (SqlPersistT m) 
 cliEventStoreWriter =
   publishingEventStoreWriter enrichedWriter (synchronousPublisher eventHandler')
   where
-    taggedStore = sqliteEventStoreWriterTagged defaultSqlEventStoreConfig
+    taggedStore = sqliteTaggedEventStoreWriter defaultSqlEventStoreConfig
     enrichedWriter = metadataEnrichingEventStoreWriter jsonStringCodec taggedStore
     dispatcher =
       commandHandlerDispatcher
