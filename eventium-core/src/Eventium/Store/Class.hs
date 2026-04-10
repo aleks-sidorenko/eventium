@@ -194,7 +194,7 @@ metadataEnrichingEventStoreWriter codec (EventStoreWriter write) =
           map
             ( \e ->
                 TaggedEvent
-                  (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
+                  (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) Nothing)
                   (codec.encode e)
             )
             events
@@ -211,7 +211,7 @@ tagEvents ::
 tagEvents codec now =
   map $ \e ->
     TaggedEvent
-      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
+      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) Nothing)
       (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of
