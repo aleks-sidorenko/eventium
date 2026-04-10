@@ -15,6 +15,7 @@ module Eventium.Store.Types
     -- * Event metadata
     EventMetadata (..),
     emptyMetadata,
+    MetadataEnricher,
     TaggedEvent (..),
 
     -- * Expected position
@@ -40,7 +41,8 @@ data EventMetadata = EventMetadata
   { eventType :: !Text,
     correlationId :: !(Maybe UUID),
     causationId :: !(Maybe UUID),
-    createdAt :: !(Maybe UTCTime)
+    createdAt :: !(Maybe UTCTime),
+    occurredAt :: !(Maybe UTCTime)
   }
   deriving (Show, Eq, Generic)
 
@@ -53,7 +55,14 @@ instance FromJSON EventMetadata where
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata
-emptyMetadata et = EventMetadata et Nothing Nothing Nothing
+emptyMetadata et = EventMetadata et Nothing Nothing Nothing Nothing
+
+-- | Builder function for customizing event metadata.
+--
+-- Used to inject application-level metadata (e.g. 'occurredAt') into events
+-- at write time. The enricher is applied after the base metadata is generated.
+-- Use 'id' when no enrichment is needed.
+type MetadataEnricher = EventMetadata -> EventMetadata
 
 -- | An event paired with pre-computed metadata. Used to thread metadata
 -- through the 'EventStoreWriter' interface without changing its type signature.

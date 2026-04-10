@@ -1,5 +1,5 @@
 name: eventium-testkit
-version: "0.2.1"
+version: "0.3.0"
 maintainer: Alexander Sidorenko
 synopsis: Testing utilities for eventium
 description: |
@@ -26,7 +26,7 @@ when:
 
 dependencies:
   - base >= 4.9 && < 5
-  - eventium-core >= 0.2.0 && < 0.3.0
+  - eventium-core >= 0.3.0 && < 0.4.0
 
   - aeson >= 1.5 && < 2.3
   - extra >= 1.7 && < 1.8

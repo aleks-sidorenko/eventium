@@ -3,6 +3,7 @@
 module Eventium.ProcessManagerSpec (spec) where
 
 import Data.IORef
+import Data.Time (UTCTime (..), fromGregorian)
 import Eventium.ProcessManager
 import Eventium.Projection
 import Eventium.Store.Class
@@ -33,9 +34,9 @@ testProcessManager =
     handleEvent st _ = st
 
     reactFn _st (StreamEvent _ _ _ (TransferInitiated target amount)) =
-      [IssueCommand target (AcceptCredit amount)]
+      [IssueCommand target (AcceptCredit amount) id]
     reactFn _st (StreamEvent sourceId _ _ (Credited _)) =
-      [IssueCommand sourceId (AcceptCredit 0)]
+      [IssueCommand sourceId (AcceptCredit 0) id]
 
 spec :: Spec
 spec = do
@@ -44,13 +45,13 @@ spec = do
       let target = uuidFromInteger 2
           event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50)
           effects = testProcessManager.react (PMState []) event
-      effects `shouldBe` [IssueCommand target (AcceptCredit 50)]
+      effects `shouldBe` [IssueCommand target (AcceptCredit 50) id]
 
     it "should produce IssueCommand for credit events" $ do
       let source = uuidFromInteger 1
           event = StreamEvent source 0 (emptyMetadata "") (Credited 100)
           effects = testProcessManager.react (PMState []) event
-      effects `shouldBe` [IssueCommand source (AcceptCredit 0)]
+      effects `shouldBe` [IssueCommand source (AcceptCredit 0) id]
 
     it "should return empty list for unmatched events" $ do
       -- Events that don't match any pattern in react
@@ -78,7 +79,7 @@ spec = do
       let dispatcher = fireAndForgetDispatcher $ \uuid cmd -> modifyIORef dispatchedRef (++ [(uuid, cmd)])
 
       let target = uuidFromInteger 2
-          effects = [IssueCommand target (AcceptCredit 50)]
+          effects = [IssueCommand target (AcceptCredit 50) id]
 
       runProcessManagerEffects dispatcher effects
 
@@ -92,9 +93,9 @@ spec = do
       let target1 = uuidFromInteger 1
           target2 = uuidFromInteger 2
           effects =
-            [ IssueCommand target1 (AcceptCredit 50),
-              IssueCommand target2 (AcceptCredit 100),
-              IssueCommand target1 (AcceptCredit 25)
+            [ IssueCommand target1 (AcceptCredit 50) id,
+              IssueCommand target2 (AcceptCredit 100) id,
+              IssueCommand target1 (AcceptCredit 25) id
             ]
 
       runProcessManagerEffects dispatcher effects
@@ -108,12 +109,12 @@ spec = do
 
     it "should dispatch commands via CommandDispatcher" $ do
       dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
-      let dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+      let dispatcher = mkCommandDispatcher $ \uuid cmd _enricher -> do
             modifyIORef dispatchedRef (++ [(uuid, cmd)])
             pure CommandSucceeded
 
       let target = uuidFromInteger 2
-          effects = [IssueCommand target (AcceptCredit 50)]
+          effects = [IssueCommand target (AcceptCredit 50) id]
 
       runProcessManagerEffects dispatcher effects
 
@@ -124,7 +125,7 @@ spec = do
       dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
       let target1 = uuidFromInteger 1
           target2 = uuidFromInteger 2
-          dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+          dispatcher = mkCommandDispatcher $ \uuid cmd _enricher -> do
             modifyIORef dispatchedRef (++ [(uuid, cmd)])
             if uuid == target1
               then pure (CommandFailed "rejected")
@@ -134,7 +135,8 @@ spec = do
             [ IssueCommandWithCompensation
                 target1
                 (AcceptCredit 50)
-                (const [IssueCommand target2 (AcceptCredit 0)])
+                id
+                (const [IssueCommand target2 (AcceptCredit 0) id])
             ]
 
       runProcessManagerEffects dispatcher effects
@@ -146,7 +148,7 @@ spec = do
       dispatchedRef <- newIORef ([] :: [(UUID, TestCommand)])
       let target1 = uuidFromInteger 1
           target2 = uuidFromInteger 2
-          dispatcher = mkCommandDispatcher $ \uuid cmd -> do
+          dispatcher = mkCommandDispatcher $ \uuid cmd _enricher -> do
             modifyIORef dispatchedRef (++ [(uuid, cmd)])
             pure CommandSucceeded
 
@@ -154,10 +156,31 @@ spec = do
             [ IssueCommandWithCompensation
                 target1
                 (AcceptCredit 50)
-                (const [IssueCommand target2 (AcceptCredit 0)])
+                id
+                (const [IssueCommand target2 (AcceptCredit 0) id])
             ]
 
       runProcessManagerEffects dispatcher effects
 
       dispatched <- readIORef dispatchedRef
       dispatched `shouldBe` [(target1, AcceptCredit 50)]
+
+    it "should thread MetadataEnricher from IssueCommand to dispatch" $ do
+      dispatchedRef <- newIORef ([] :: [(UUID, TestCommand, MetadataEnricher)])
+      let dispatcher = CommandDispatcher $ \uuid cmd enricher -> do
+            modifyIORef dispatchedRef (++ [(uuid, cmd, enricher)])
+            pure CommandSucceeded
+
+      let target = uuidFromInteger 2
+          enricher m = m {occurredAt = Just (UTCTime (fromGregorian 2025 3 15) 0)}
+          effects = [IssueCommand target (AcceptCredit 50) enricher]
+
+      runProcessManagerEffects dispatcher effects
+
+      dispatched <- readIORef dispatchedRef
+      case dispatched of
+        [(_, cmd, enr)] -> do
+          cmd `shouldBe` AcceptCredit 50
+          let enriched = enr (emptyMetadata "test")
+          enriched.occurredAt `shouldBe` Just (UTCTime (fromGregorian 2025 3 15) 0)
+        _ -> expectationFailure "expected exactly one dispatch"

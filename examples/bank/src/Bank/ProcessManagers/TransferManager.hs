@@ -61,6 +61,7 @@ reactTransfer manager (StreamEvent sourceAcct _ _ (AccountTransferStartedEvent e
                   amount = evt.amount
                 }
           )
+          id
           ( \(RejectionReason rejectionReason) ->
               [ IssueCommand
                   sourceAcct
@@ -70,6 +71,7 @@ reactTransfer manager (StreamEvent sourceAcct _ _ (AccountTransferStartedEvent e
                           reason = T.unpack rejectionReason
                         }
                   )
+                  id
               ]
           )
       ]
@@ -83,6 +85,7 @@ reactTransfer manager (StreamEvent _ _ _ (AccountCreditedFromTransferEvent evt))
           ( CompleteTransferCommand $
               CompleteTransfer evt.transferId
           )
+          id
       ]
 reactTransfer _ _ = []
 

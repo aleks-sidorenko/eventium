@@ -5,7 +5,7 @@
 -- | Defines an Sqlite event store.
 module Eventium.Store.Sqlite
   ( sqliteEventStoreWriter,
-    sqliteEventStoreWriterTagged,
+    sqliteTaggedEventStoreWriter,
     initializeSqliteEventStore,
     module Eventium.Store.Class,
     module Eventium.Store.Sql,
@@ -32,11 +32,11 @@ sqliteEventStoreWriter config = EventStoreWriter $ transactionalExpectedWriteHel
 
 -- | Like 'sqliteEventStoreWriter' but accepts 'TaggedEvent's,
 -- preserving the metadata attached to each event.
-sqliteEventStoreWriterTagged ::
+sqliteTaggedEventStoreWriter ::
   (MonadIO m, PersistEntity entity, PersistEntityBackend entity ~ SqlBackend, SafeToInsert entity) =>
   SqlEventStoreConfig entity serialized ->
   VersionedEventStoreWriter (SqlPersistT m) (TaggedEvent serialized)
-sqliteEventStoreWriterTagged config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
+sqliteTaggedEventStoreWriter config = EventStoreWriter $ transactionalExpectedWriteHelper getLatestVersion storeEvents'
   where
     getLatestVersion = sqlMaxEventVersion config maxSqliteVersionSql
     storeEvents' = sqlStoreEventsTagged config Nothing maxSqliteVersionSql

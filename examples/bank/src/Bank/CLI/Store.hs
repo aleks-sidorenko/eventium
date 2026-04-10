@@ -28,13 +28,14 @@ cliEventStoreReader = codecVersionedEventStoreReader jsonStringCodec $ sqlEventS
 
 cliEventStoreWriter :: (MonadIO m) => VersionedEventStoreWriter (SqlPersistT m) BankEvent
 cliEventStoreWriter =
-  publishingEventStoreWriter writer (synchronousPublisher eventHandler')
+  publishingEventStoreWriter enrichedWriter (synchronousPublisher eventHandler')
   where
-    sqlStore = sqliteEventStoreWriter defaultSqlEventStoreConfig
-    writer = codecEventStoreWriter jsonStringCodec sqlStore
+    taggedStore = sqliteTaggedEventStoreWriter defaultSqlEventStoreConfig
+    enrichedWriter = metadataEnrichingEventStoreWriter jsonStringCodec taggedStore
     dispatcher =
       commandHandlerDispatcher
-        cliEventStoreWriter
+        jsonStringCodec
+        taggedStore
         cliEventStoreReader
         [mkAggregateHandlerWith formatAccountError accountBankCommandHandler]
     eventHandler' =
