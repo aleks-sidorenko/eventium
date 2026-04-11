@@ -1,5 +1,5 @@
 name: examples-bank
-version: "0.3.0"
+version: "0.3.1"
 maintainer: Alexander Sidorenko
 synopsis: Example bank application for eventium
 description: |
