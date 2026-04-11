@@ -4,7 +4,7 @@ module Eventium.MetadataEnrichmentSpec (spec) where
 
 import Control.Concurrent.STM
 import Data.IORef
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (isJust)
 import Data.Time (UTCTime (..), fromGregorian)
 import Eventium
 import Eventium.Store.Memory
@@ -33,7 +33,7 @@ spec = describe "Metadata enrichment" $ do
       events <- reader.getEvents (allEvents uuid)
       all (\e -> isJust e.metadata.createdAt) events `shouldBe` True
 
-    it "preserves occurredAt when set via enricher" $ do
+    it "defaults occurredAt to createdAt" $ do
       tvar <- eventMapTVar
       let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
@@ -41,8 +41,8 @@ spec = describe "Metadata enrichment" $ do
           uuid = uuidFromInteger 1
       _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
       events <- reader.getEvents (allEvents uuid)
-      -- occurredAt should be Nothing by default (auto-enrichment doesn't set it)
-      all (\e -> isNothing e.metadata.occurredAt) events `shouldBe` True
+      -- occurredAt should default to createdAt
+      map (\e -> e.metadata.occurredAt) events `shouldBe` map (\e -> e.metadata.createdAt) events
 
   describe "metadataEnrichingEventStoreWriterWithEnricher" $ do
     it "applies MetadataEnricher to set occurredAt" $ do
@@ -57,7 +57,7 @@ spec = describe "Metadata enrichment" $ do
       events <- reader.getEvents (allEvents uuid)
       map (\e -> e.metadata.occurredAt) events `shouldBe` [Just pastTime]
 
-    it "id enricher leaves occurredAt as Nothing" $ do
+    it "defaults occurredAt to createdAt when enricher does not set it" $ do
       tvar <- eventMapTVar
       let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher id testCodec (runEventStoreWriterUsing atomically taggedWriter)
@@ -65,7 +65,8 @@ spec = describe "Metadata enrichment" $ do
           uuid = uuidFromInteger 1
       _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
       events <- reader.getEvents (allEvents uuid)
-      map (\e -> e.metadata.occurredAt) events `shouldBe` [Nothing]
+      -- occurredAt should default to createdAt
+      map (\e -> e.metadata.occurredAt) events `shouldBe` map (\e -> e.metadata.createdAt) events
 
   describe "backward compatibility" $ do
     it "non-tagged writer still uses empty metadata" $ do
