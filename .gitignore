@@ -19,3 +19,7 @@ tags
 
 # Worktrees
 .worktrees/
+
+# Internal planning docs (kept locally, not tracked)
+docs/plans/
+docs/specs/
