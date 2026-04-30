@@ -34,7 +34,7 @@ data StreamEvent key position event = StreamEvent
 
 - **key** -- identifies the stream (typically `UUID` for aggregates, `()` for the global stream).
 - **position** -- ordering within the stream (`EventVersion` per aggregate, `SequenceNumber` globally).
-- **metadata** -- `EventMetadata` carrying event type name, optional correlation/causation IDs, timestamp, and optional `occurredAt` for backdated events.
+- **metadata** -- `EventMetadata` carrying event type name, optional correlation/causation IDs, and timestamp.
 - **event** -- the domain payload.
 
 Common type aliases:
@@ -151,17 +151,22 @@ metadata at write time. The enricher is applied after base metadata generation
 Use `id` when no enrichment is needed. Compose enrichers with `.`:
 
 ```haskell
--- Set occurredAt for backdated events
-let enricher = \m -> m { occurredAt = Just pastTime }
+-- Inject correlation ID from saga context
+let enricher = \m -> m { correlationId = Just corrId }
 
 -- Compose multiple enrichments
-let enricher = (\m -> m { occurredAt = Just pastTime })
-             . (\m -> m { correlationId = Just corrId })
+let enricher = (\m -> m { correlationId = Just corrId })
+             . (\m -> m { causationId = Just causeId })
 ```
 
 The enricher flows through `CommandDispatcher`, `ProcessManagerEffect`, and
 `commandHandlerDispatcher`. `metadataEnrichingEventStoreWriterWithEnricher`
 applies it at the writer level.
+
+Note: business-meaningful timestamps (e.g. when an order was placed, when a
+transfer was initiated by the user) belong in event payloads, not in metadata.
+Metadata holds infrastructure fields the library itself uses or generates;
+domain facts are payload concerns.
 
 ### CommandDispatcher
 

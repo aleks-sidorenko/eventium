@@ -185,8 +185,8 @@ metadataEnrichingEventStoreWriter = metadataEnrichingEventStoreWriterWithEnriche
 -- writer that accepts domain events. Each event is encoded and tagged
 -- with metadata (event type name derived from 'Typeable', current
 -- UTC timestamp). The supplied 'MetadataEnricher' is applied to the
--- generated metadata before writing — use this to inject application-level
--- fields such as @occurredAt@.
+-- generated metadata before writing — use this to inject saga-level
+-- fields such as @correlationId@ and @causationId@.
 metadataEnrichingEventStoreWriterWithEnricher ::
   (MonadIO m, Typeable event) =>
   MetadataEnricher ->
@@ -200,7 +200,7 @@ metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter w
           map
             ( \e ->
                 TaggedEvent
-                  (enricher (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) (Just now)))
+                  (enricher (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now)))
                   (codec.encode e)
             )
             events
@@ -217,7 +217,7 @@ tagEvents ::
 tagEvents codec now =
   map $ \e ->
     TaggedEvent
-      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now) (Just now))
+      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
       (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of

@@ -5,7 +5,6 @@ module Eventium.MetadataEnrichmentSpec (spec) where
 import Control.Concurrent.STM
 import Data.IORef
 import Data.Maybe (isJust)
-import Data.Time (UTCTime (..), fromGregorian)
 import Eventium
 import Eventium.Store.Memory
 import Test.Hspec
@@ -33,31 +32,20 @@ spec = describe "Metadata enrichment" $ do
       events <- reader.getEvents (allEvents uuid)
       all (\e -> isJust e.metadata.createdAt) events `shouldBe` True
 
-    it "defaults occurredAt to createdAt" $ do
-      tvar <- eventMapTVar
-      let taggedWriter = tvarTaggedEventStoreWriter tvar
-          enrichedWriter = metadataEnrichingEventStoreWriter testCodec (runEventStoreWriterUsing atomically taggedWriter)
-          reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
-          uuid = uuidFromInteger 1
-      _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
-      events <- reader.getEvents (allEvents uuid)
-      -- occurredAt should default to createdAt
-      map (\e -> e.metadata.occurredAt) events `shouldBe` map (\e -> e.metadata.createdAt) events
-
   describe "metadataEnrichingEventStoreWriterWithEnricher" $ do
-    it "applies MetadataEnricher to set occurredAt" $ do
+    it "applies MetadataEnricher to set correlationId" $ do
       tvar <- eventMapTVar
-      let pastTime = UTCTime (fromGregorian 2025 3 15) 0
-          enricher m = m {occurredAt = Just pastTime}
+      let corrId = uuidFromInteger 99
+          enricher m = m {correlationId = Just corrId}
           taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher enricher testCodec (runEventStoreWriterUsing atomically taggedWriter)
           reader = runEventStoreReaderUsing atomically (tvarEventStoreReader tvar)
           uuid = uuidFromInteger 1
       _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
       events <- reader.getEvents (allEvents uuid)
-      map (\e -> e.metadata.occurredAt) events `shouldBe` [Just pastTime]
+      map (\e -> e.metadata.correlationId) events `shouldBe` [Just corrId]
 
-    it "defaults occurredAt to createdAt when enricher does not set it" $ do
+    it "leaves correlationId unset when enricher is id" $ do
       tvar <- eventMapTVar
       let taggedWriter = tvarTaggedEventStoreWriter tvar
           enrichedWriter = metadataEnrichingEventStoreWriterWithEnricher id testCodec (runEventStoreWriterUsing atomically taggedWriter)
@@ -65,8 +53,7 @@ spec = describe "Metadata enrichment" $ do
           uuid = uuidFromInteger 1
       _ <- enrichedWriter.storeEvents uuid NoStream [42 :: Int]
       events <- reader.getEvents (allEvents uuid)
-      -- occurredAt should default to createdAt
-      map (\e -> e.metadata.occurredAt) events `shouldBe` map (\e -> e.metadata.createdAt) events
+      map (\e -> e.metadata.correlationId) events `shouldBe` [Nothing]
 
   describe "backward compatibility" $ do
     it "non-tagged writer still uses empty metadata" $ do
