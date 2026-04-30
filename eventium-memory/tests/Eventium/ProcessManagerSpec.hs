@@ -3,7 +3,6 @@
 module Eventium.ProcessManagerSpec (spec) where
 
 import Data.IORef
-import Data.Time (UTCTime (..), fromGregorian)
 import Eventium.ProcessManager
 import Eventium.Projection
 import Eventium.Store.Class
@@ -172,7 +171,8 @@ spec = do
             pure CommandSucceeded
 
       let target = uuidFromInteger 2
-          enricher m = m {occurredAt = Just (UTCTime (fromGregorian 2025 3 15) 0)}
+          corrId = uuidFromInteger 99
+          enricher m = m {correlationId = Just corrId}
           effects = [IssueCommand target (AcceptCredit 50) enricher]
 
       runProcessManagerEffects dispatcher effects
@@ -182,5 +182,5 @@ spec = do
         [(_, cmd, enr)] -> do
           cmd `shouldBe` AcceptCredit 50
           let enriched = enr (emptyMetadata "test")
-          enriched.occurredAt `shouldBe` Just (UTCTime (fromGregorian 2025 3 15) 0)
+          enriched.correlationId `shouldBe` Just corrId
         _ -> expectationFailure "expected exactly one dispatch"

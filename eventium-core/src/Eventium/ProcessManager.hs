@@ -57,8 +57,9 @@ newtype RejectionReason = RejectionReason {unRejectionReason :: Text}
 -- data type — it describes /what/ should happen, not /how/.
 --
 -- Each constructor carries a 'MetadataEnricher' so the saga can inject
--- application-level metadata (e.g. @occurredAt@) into events produced by the
--- dispatched command. Use 'id' when no enrichment is needed.
+-- saga-level fields (e.g. @correlationId@, @causationId@) from the ambient
+-- message context into events produced by the dispatched command. Use 'id'
+-- when no enrichment is needed.
 data ProcessManagerEffect command
   = -- | Issue a command to a specific aggregate (identified by 'UUID').
     IssueCommand UUID command MetadataEnricher
