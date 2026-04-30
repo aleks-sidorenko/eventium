@@ -16,7 +16,7 @@ hpack:
     @echo "✓ Done"
 
 # Build all packages
-build:
+build: hpack
     @echo "Building all packages..."
     cabal build all
     @echo "✓ Build complete"
@@ -24,14 +24,20 @@ build:
 # Run all tests
 test:
     @echo "Running tests..."
-    cabal test all
+    cabal test all --test-show-details=direct --enable-tests
     @echo "✓ Tests complete"
 
-# Run hlint
-lint:
-    @echo "Linting code..."
-    hlint --git
-    @echo "✓ Lint complete"
+# Run tests with coverage
+test-coverage:
+    @echo "Running tests with coverage..."
+    cabal test all --enable-coverage --test-show-details=direct --enable-tests
+
+# Clean build artifacts
+clean:
+    @echo "Cleaning build artifacts..."
+    cabal clean
+    rm -rf dist-newstyle/
+    @echo "✓ Clean complete"
 
 # Format all Haskell source files with ormolu
 format:
@@ -39,8 +45,26 @@ format:
     find . -name '*.hs' -not -path './dist-newstyle/*' -exec ormolu --mode inplace {} +
     @echo "✓ Format complete"
 
-# Format and lint code
-check: format lint
+# Check formatting without modifying files
+format-check:
+    @echo "Checking code formatting..."
+    find . -name '*.hs' -not -path './dist-newstyle/*' -exec ormolu --mode check {} +
+    @echo "✓ Format check complete"
+
+# Lint code with hlint (read-only)
+lint:
+    @echo "Linting code..."
+    hlint --git
+    @echo "✓ Lint complete"
+
+# Auto-fix lint issues with hlint --refactor (requires apply-refact)
+lint-fix:
+    @echo "Auto-fixing lint issues..."
+    hlint --git --refactor --refactor-options="-i"
+    @echo "✓ Lint fix complete"
+
+# Read-only quality umbrella: format check + lint (CI-safe)
+check: format-check lint
     @echo "✓ Code quality checks complete"
 
 # Continuous compilation
@@ -81,6 +105,50 @@ db-psql:
 db-restart: db-down db-up
     @echo "✓ PostgreSQL restarted"
 
+# Clean and rebuild
+rebuild: clean build
+
+# Run all checks and build
+all: check test build
+    @echo "✓ All tasks complete"
+
+# Update dependencies
+update:
+    @echo "Updating dependencies..."
+    cabal update
+    @echo "✓ Dependencies updated"
+
+# Generate REPL session
+repl:
+    cabal repl
+
+# Generate documentation
+docs:
+    @echo "Generating documentation..."
+    cabal haddock all --haddock-hyperlink-source
+    @echo "✓ Documentation generated in dist-newstyle/"
+
+# Show project info
+info:
+    @echo "Project: Eventium"
+    @echo "GHC: $(ghc --version)"
+    @echo "Cabal: $(cabal --version | head -n1)"
+    @echo "Database: PostgreSQL 15 (Docker Compose)"
+    @echo ""
+    @echo "Quick commands:"
+    @echo "  just build       - Build all packages"
+    @echo "  just test        - Run tests"
+    @echo "  just db-up       - Start PostgreSQL"
+    @echo "  just check       - Format check and lint"
+
+# --- CI ---
+
+# Trigger CI workflow for the current branch
+ci:
+    gh workflow run CI --ref "$(git branch --show-current)"
+
+# --- Hackage ---
+
 # Publish to Hackage (candidate by default, use --publish to publish for real)
-hackage-publish *ARGS:
-    ./scripts/publish-to-hackage.sh {{ARGS}}
+publish *ARGS:
+    ./scripts/publish.sh {{ARGS}}
