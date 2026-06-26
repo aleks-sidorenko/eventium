@@ -9,6 +9,7 @@
 module Eventium.ReadModel
   ( ReadModel (..),
     runReadModel,
+    catchUpReadModel,
     rebuildReadModel,
     combineReadModels,
     readModelPublisher,
@@ -52,15 +53,20 @@ runReadModel globalReader pollIntervalMs rm = do
   rm.initialize
   forever $ pollReadModelOnce globalReader pollIntervalMs rm
 
--- | Reset the read model and replay all events from the beginning.
--- Returns after processing all currently available events.
-rebuildReadModel ::
+-- | Bring a read model up to date from its current checkpoint, without
+-- resetting it. Initializes, then replays @checkpoint+1 → latest@ and returns
+-- once all currently-available events are processed.
+--
+-- This is the one-shot startup/backfill counterpart to 'runReadModel' (which
+-- polls forever) and 'rebuildReadModel' (which resets first). Safe to run on a
+-- persistent read model at boot: it never wipes durable state, and replays
+-- nothing when the checkpoint is already current.
+catchUpReadModel ::
   (Monad m) =>
   GlobalEventStoreReader m event ->
   ReadModel m event ->
   m ()
-rebuildReadModel globalReader rm = do
-  rm.reset
+catchUpReadModel globalReader rm = do
   rm.initialize
   replayAll
   where
@@ -73,6 +79,17 @@ rebuildReadModel globalReader rm = do
           handleEvents rm.eventHandler newEvents
           rm.checkpointStore.saveCheckpoint (NE.last ne).position
           replayAll
+
+-- | Reset the read model and replay all events from the beginning.
+-- Returns after processing all currently available events.
+rebuildReadModel ::
+  (Monad m) =>
+  GlobalEventStoreReader m event ->
+  ReadModel m event ->
+  m ()
+rebuildReadModel globalReader rm = do
+  rm.reset
+  catchUpReadModel globalReader rm
 
 -- | Combine multiple read models into one. Events are fanned out to all
 -- handlers. Initialize and reset run all sub-models.

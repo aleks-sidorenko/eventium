@@ -28,6 +28,9 @@
   - `readModelPublisher` — drive a `ReadModel` *synchronously* in the write
     transaction (apply handler + advance checkpoint), the counterpart to the async
     `runReadModel`. The same `ReadModel` value runs in either mode.
+  - `catchUpReadModel` — one-shot catch-up from the current checkpoint *without*
+    resetting (the startup/backfill counterpart; `rebuildReadModel` is now
+    `reset` then `catchUpReadModel`).
 - **Testkit**: the shared store spec now asserts write-assigned global positions
   match the global reader's, on every backend.
 

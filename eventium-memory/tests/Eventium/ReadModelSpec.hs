@@ -215,3 +215,37 @@ spec = do
       -- Nothing is left for an async catch-up: the checkpoint is already current.
       newEvents <- globalReader.getEvents (eventsStartingAt () 4)
       length newEvents `shouldBe` 0
+
+  describe "catchUpReadModel" $ do
+    it "brings a model current without resetting, and is a no-op when current" $ do
+      eventTVar <- eventMapTVar
+      let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter eventTVar)
+          globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader eventTVar)
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [Added 1, Added 2]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [Added 10]
+
+      sumRef <- newTVarIO (0 :: Int)
+      checkpointRef <- newTVarIO (0 :: SequenceNumber)
+      resetCount <- newTVarIO (0 :: Int)
+      let rm =
+            ReadModel
+              { initialize = pure (),
+                eventHandler = EventHandler $ \globalEvent ->
+                  case globalEvent.payload.payload of
+                    Added n -> atomically $ modifyTVar' sumRef (+ n)
+                    _ -> return (),
+                checkpointStore =
+                  CheckpointStore
+                    { getCheckpoint = readTVarIO checkpointRef,
+                      saveCheckpoint = atomically . writeTVar checkpointRef
+                    },
+                reset = atomically $ modifyTVar' resetCount (+ 1)
+              }
+
+      catchUpReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 13
+      readTVarIO checkpointRef `shouldReturn` 3
+      -- Did not reset, and a second catch-up applies nothing new.
+      catchUpReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 13
+      readTVarIO resetCount `shouldReturn` 0
