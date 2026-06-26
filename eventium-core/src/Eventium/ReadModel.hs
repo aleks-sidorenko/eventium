@@ -33,7 +33,8 @@ import Eventium.Store.Class
 -- * 'initialize' — idempotent setup (run migrations, create tables)
 -- * 'eventHandler' — processes global stream events, writes to user-defined storage
 -- * 'checkpointStore' — tracks the last processed 'SequenceNumber'
--- * 'reset' — drop view data and reset checkpoint (for full rebuilds)
+-- * 'reset' — drop the view's data (tables). The checkpoint is reset by
+--   'rebuildReadModel', so 'reset' need only clear user-owned storage.
 data ReadModel m event = ReadModel
   { initialize :: m (),
     eventHandler :: EventHandler m (GlobalStreamEvent event),
@@ -89,6 +90,9 @@ rebuildReadModel ::
   m ()
 rebuildReadModel globalReader rm = do
   rm.reset
+  -- Reset the checkpoint we own, so the user's 'reset' only has to drop view
+  -- data; then replay from the start.
+  rm.checkpointStore.saveCheckpoint 0
   catchUpReadModel globalReader rm
 
 -- | Combine multiple read models into one. Events are fanned out to all

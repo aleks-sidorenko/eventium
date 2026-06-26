@@ -31,6 +31,11 @@
   - `catchUpReadModel` — one-shot catch-up from the current checkpoint *without*
     resetting (the startup/backfill counterpart; `rebuildReadModel` is now
     `reset` then `catchUpReadModel`).
+  - `rebuildReadModel` now resets the checkpoint itself, so a `ReadModel`'s
+    `reset` need only drop its view data (tables) — it no longer has to remember
+    to zero the checkpoint. (Fixes a footgun where a `reset` that cleared data but
+    not the checkpoint made `rebuildReadModel` replay from a stale position and
+    project nothing.)
 - **Testkit**: the shared store spec now asserts write-assigned global positions
   match the global reader's, on every backend.
 
