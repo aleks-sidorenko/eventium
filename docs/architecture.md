@@ -76,12 +76,24 @@ newtype EventStoreReader key position m event = EventStoreReader
 
 newtype EventStoreWriter key position m event = EventStoreWriter
   { storeEvents :: key -> ExpectedPosition position -> [event]
-                -> m (Either (EventWriteError position) EventVersion) }
+                -> m (Either (EventWriteError position) WriteResult) }
+
+-- one (per-stream version, assigned global position) per event, in write order
+type WrittenEventPosition = (EventVersion, SequenceNumber)
+type WriteResult          = [WrittenEventPosition]
 ```
 
 Polymorphic over key type, position type, monad, and event type.
 `runEventStoreReaderUsing` / `runEventStoreWriterUsing` lift stores between
 monads (e.g. `STM` to `IO`, `SqlPersistT m` to `m`).
+
+A successful write returns a `WriteResult`: for each event written, the
+per-stream `EventVersion` and the global `SequenceNumber` the store assigned it
+(accessors: `versions`, `globalPositions`, `lastVersion`, `lastPosition`).
+Exposing the assigned global positions lets a synchronous subscriber publish
+`GlobalStreamEvent`s with their true positions and advance a `CheckpointStore`
+within the write transaction — they match what the global reader derives, since
+they are assigned under the store's global-ordering guarantee.
 
 **Optimistic concurrency** is enforced via `ExpectedPosition`:
 
@@ -218,6 +230,21 @@ publishingEventStoreWriter
 Wraps a store writer so that after each successful write, events are
 dispatched to an `EventPublisher`. `synchronousPublisher` creates a publisher
 from an `EventHandler` for in-process dispatch.
+
+**Global publishing.** `GlobalEventPublisher` and
+`publishingGlobalEventStoreWriter` / `publishingGlobalTaggedCodecEventStoreWriter`
+publish `GlobalStreamEvent`s with the real `SequenceNumber`s from the
+`WriteResult`, rather than per-stream versioned events with fabricated positions.
+`synchronousGlobalPublisher` builds one from a global `EventHandler`, and
+`globalToVersionedHandler` lifts an existing versioned handler (process manager,
+logger) to consume global events.
+
+This makes a `ReadModel` **dual-mode**: drive it asynchronously with
+`runReadModel` (poll the global reader), or synchronously in the write
+transaction with `readModelPublisher` (apply its handler + advance its
+checkpoint, wired through a global-publishing writer). The same `ReadModel`
+definition serves both; the latter gives strongly-consistent, read-after-write
+projections.
 
 ### EventSubscription
 

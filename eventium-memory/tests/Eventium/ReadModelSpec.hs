@@ -180,3 +180,38 @@ spec = do
       rB <- readTVarIO resetB
       rA `shouldBe` True
       rB `shouldBe` True
+
+  describe "readModelPublisher (synchronous driver)" $ do
+    it "applies the handler and advances the checkpoint during the write" $ do
+      eventTVar <- eventMapTVar
+      sumRef <- newTVarIO (0 :: Int)
+      checkpointRef <- newTVarIO (0 :: SequenceNumber)
+      let baseWriter = runEventStoreWriterUsing atomically (tvarEventStoreWriter eventTVar)
+          globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader eventTVar)
+          rm =
+            ReadModel
+              { initialize = pure (),
+                eventHandler = EventHandler $ \globalEvent ->
+                  case globalEvent.payload.payload of
+                    Added n -> atomically $ modifyTVar' sumRef (+ n)
+                    _ -> return (),
+                checkpointStore =
+                  CheckpointStore
+                    { getCheckpoint = readTVarIO checkpointRef,
+                      saveCheckpoint = atomically . writeTVar checkpointRef
+                    },
+                reset = pure ()
+              }
+          -- Same ReadModel, driven synchronously in the write path.
+          writer = publishingGlobalEventStoreWriter baseWriter (readModelPublisher rm)
+
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [Added 1, Added 2]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [Added 10]
+
+      -- Handler ran synchronously during the writes.
+      readTVarIO sumRef `shouldReturn` 13
+      -- Checkpoint advanced in-line to the last assigned global position.
+      readTVarIO checkpointRef `shouldReturn` 3
+      -- Nothing is left for an async catch-up: the checkpoint is already current.
+      newEvents <- globalReader.getEvents (eventsStartingAt () 4)
+      length newEvents `shouldBe` 0

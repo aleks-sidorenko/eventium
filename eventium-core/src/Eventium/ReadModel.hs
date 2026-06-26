@@ -11,6 +11,7 @@ module Eventium.ReadModel
     runReadModel,
     rebuildReadModel,
     combineReadModels,
+    readModelPublisher,
   )
 where
 
@@ -20,6 +21,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Foldable (traverse_)
 import qualified Data.List.NonEmpty as NE
 import Eventium.EventHandler
+import Eventium.EventPublisher (GlobalEventPublisher (..))
 import Eventium.EventSubscription (CheckpointStore (..), PollingIntervalMillis)
 import Eventium.Store.Class
 
@@ -94,6 +96,25 @@ combineReadModels rms =
           },
       reset = traverse_ (.reset) rms
     }
+
+-- | Drive a 'ReadModel' synchronously from a write's published global events:
+-- apply its handler to the batch and advance its checkpoint to the last event's
+-- global position. The synchronous counterpart to 'runReadModel' — wire it into
+-- a 'publishingGlobalEventStoreWriter' / 'publishingGlobalTaggedCodecEventStoreWriter'
+-- to project the read model in the write transaction (strong consistency).
+--
+-- The same 'ReadModel' value can therefore be run either asynchronously
+-- ('runReadModel') or synchronously (here). 'initialize'/'reset'/'rebuildReadModel'
+-- remain the lifecycle/backfill path.
+readModelPublisher ::
+  (Monad m) =>
+  ReadModel m event ->
+  GlobalEventPublisher m event
+readModelPublisher rm = GlobalEventPublisher $ \events -> do
+  handleEvents rm.eventHandler events
+  case NE.nonEmpty events of
+    Nothing -> return ()
+    Just ne -> rm.checkpointStore.saveCheckpoint (NE.last ne).position
 
 pollReadModelOnce ::
   (MonadIO m) =>

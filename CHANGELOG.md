@@ -1,5 +1,36 @@
 # eventium Changelog
 
+## 0.4.0
+
+### Breaking
+
+- **`EventStoreWriter` now reports the assigned global positions.** A successful
+  write returns `WriteResult` (`= [(EventVersion, SequenceNumber)]`, one pair per
+  event in write order) instead of just the end `EventVersion`. This exposes the
+  real global `SequenceNumber`s the store assigns, so a synchronous subscriber can
+  publish `GlobalStreamEvent`s with true positions and advance a `CheckpointStore`
+  in the write transaction. `transactionalExpectedWriteHelper`'s store callback
+  and all backend writers (postgresql, sqlite, memory) change accordingly.
+  Accessors `versions`, `globalPositions`, `lastVersion`, `lastPosition` are
+  provided on `WriteResult`.
+
+### Additions
+
+- **Global publishing** (`eventium-core`, `Eventium.EventPublisher`):
+  - `GlobalEventPublisher` (with `Semigroup`/`Monoid`) — publishes
+    `GlobalStreamEvent`s carrying real `SequenceNumber`s.
+  - `publishingGlobalEventStoreWriter` / `publishingGlobalTaggedCodecEventStoreWriter`
+    — wrap a writer to publish global events from the `WriteResult`.
+  - `synchronousGlobalPublisher`, and `globalToVersionedHandler` to lift existing
+    `VersionedStreamEvent` handlers (process managers, loggers) into a global
+    publisher.
+- **Dual-mode read models** (`eventium-core`, `Eventium.ReadModel`):
+  - `readModelPublisher` — drive a `ReadModel` *synchronously* in the write
+    transaction (apply handler + advance checkpoint), the counterpart to the async
+    `runReadModel`. The same `ReadModel` value runs in either mode.
+- **Testkit**: the shared store spec now asserts write-assigned global positions
+  match the global reader's, on every backend.
+
 ## 0.2.1 (Unreleased)
 
 ### Additions
