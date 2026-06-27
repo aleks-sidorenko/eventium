@@ -49,8 +49,9 @@ mkTestStore = do
         let events = map (.payload) taggedEvents
             startVersion = fromIntegral (length existing)
             versioned = zipWith (\i e -> StreamEvent uuid i (emptyMetadata "") e) [startVersion ..] events
+            poss = take (length events) [SequenceNumber (length existing + 1) ..]
         modifyIORef eventsRef (++ versioned)
-        pure (Right (startVersion + fromIntegral (length events) - 1))
+        pure (Right (zip [startVersion ..] poss))
       reader = EventStoreReader $ \query -> do
         allEvts <- readIORef eventsRef
         pure $ filterByQuery query allEvts

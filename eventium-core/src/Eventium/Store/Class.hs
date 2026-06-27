@@ -59,7 +59,7 @@ type GlobalEventStoreReader m event = EventStoreReader () SequenceNumber m (Glob
 -- | An 'EventStoreWriter' is a function to write some events of type @event@
 -- to an event store in some monad @m@.
 newtype EventStoreWriter key position m event
-  = EventStoreWriter {storeEvents :: key -> ExpectedPosition position -> [event] -> m (Either (EventWriteError position) EventVersion)}
+  = EventStoreWriter {storeEvents :: key -> ExpectedPosition position -> [event] -> m (Either (EventWriteError position) EventWriteResult)}
 
 instance Contravariant (EventStoreWriter key position m) where
   contramap f (EventStoreWriter writer) = EventStoreWriter $ \key expectedPos -> writer key expectedPos . fmap f
@@ -72,11 +72,11 @@ type VersionedEventStoreWriter = EventStoreWriter UUID EventVersion
 transactionalExpectedWriteHelper ::
   (Monad m, Ord position, Num position) =>
   (key -> m position) ->
-  (key -> [event] -> m EventVersion) ->
+  (key -> [event] -> m EventWriteResult) ->
   key ->
   ExpectedPosition position ->
   [event] ->
-  m (Either (EventWriteError position) EventVersion)
+  m (Either (EventWriteError position) EventWriteResult)
 transactionalExpectedWriteHelper getLatestVersion' storeEvents' key expected =
   go expected getLatestVersion' storeEvents' key
   where
@@ -89,10 +89,10 @@ transactionalExpectedWriteHelper' ::
   (Monad m) =>
   Maybe (position -> Bool) ->
   (key -> m position) ->
-  (key -> [event] -> m EventVersion) ->
+  (key -> [event] -> m EventWriteResult) ->
   key ->
   [event] ->
-  m (Either (EventWriteError position) EventVersion)
+  m (Either (EventWriteError position) EventWriteResult)
 transactionalExpectedWriteHelper' Nothing _ storeEvents' uuid events =
   storeEvents' uuid events <&> Right
 transactionalExpectedWriteHelper' (Just f) getLatestVersion' storeEvents' uuid events = do

@@ -180,3 +180,107 @@ spec = do
       rB <- readTVarIO resetB
       rA `shouldBe` True
       rB `shouldBe` True
+
+  describe "readModelPublisher (synchronous driver)" $ do
+    it "applies the handler and advances the checkpoint during the write" $ do
+      eventTVar <- eventMapTVar
+      sumRef <- newTVarIO (0 :: Int)
+      checkpointRef <- newTVarIO (0 :: SequenceNumber)
+      let baseWriter = runEventStoreWriterUsing atomically (tvarEventStoreWriter eventTVar)
+          globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader eventTVar)
+          rm =
+            ReadModel
+              { initialize = pure (),
+                eventHandler = EventHandler $ \globalEvent ->
+                  case globalEvent.payload.payload of
+                    Added n -> atomically $ modifyTVar' sumRef (+ n)
+                    _ -> return (),
+                checkpointStore =
+                  CheckpointStore
+                    { getCheckpoint = readTVarIO checkpointRef,
+                      saveCheckpoint = atomically . writeTVar checkpointRef
+                    },
+                reset = pure ()
+              }
+          -- Same ReadModel, driven synchronously in the write path.
+          writer = publishingGlobalEventStoreWriter baseWriter (readModelPublisher rm)
+
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [Added 1, Added 2]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [Added 10]
+
+      -- Handler ran synchronously during the writes.
+      readTVarIO sumRef `shouldReturn` 13
+      -- Checkpoint advanced in-line to the last assigned global position.
+      readTVarIO checkpointRef `shouldReturn` 3
+      -- Nothing is left for an async catch-up: the checkpoint is already current.
+      newEvents <- globalReader.getEvents (eventsStartingAt () 4)
+      length newEvents `shouldBe` 0
+
+  describe "catchUpReadModel" $ do
+    it "brings a model current without resetting, and is a no-op when current" $ do
+      eventTVar <- eventMapTVar
+      let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter eventTVar)
+          globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader eventTVar)
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [Added 1, Added 2]
+      _ <- writer.storeEvents (uuidFromInteger 2) NoStream [Added 10]
+
+      sumRef <- newTVarIO (0 :: Int)
+      checkpointRef <- newTVarIO (0 :: SequenceNumber)
+      resetCount <- newTVarIO (0 :: Int)
+      let rm =
+            ReadModel
+              { initialize = pure (),
+                eventHandler = EventHandler $ \globalEvent ->
+                  case globalEvent.payload.payload of
+                    Added n -> atomically $ modifyTVar' sumRef (+ n)
+                    _ -> return (),
+                checkpointStore =
+                  CheckpointStore
+                    { getCheckpoint = readTVarIO checkpointRef,
+                      saveCheckpoint = atomically . writeTVar checkpointRef
+                    },
+                reset = atomically $ modifyTVar' resetCount (+ 1)
+              }
+
+      catchUpReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 13
+      readTVarIO checkpointRef `shouldReturn` 3
+      -- Did not reset, and a second catch-up applies nothing new.
+      catchUpReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 13
+      readTVarIO resetCount `shouldReturn` 0
+
+  describe "rebuildReadModel resets the checkpoint itself" $ do
+    it "replays from scratch even when reset clears only view data" $ do
+      eventTVar <- eventMapTVar
+      let writer = runEventStoreWriterUsing atomically (tvarEventStoreWriter eventTVar)
+          globalReader = runEventStoreReaderUsing atomically (tvarGlobalEventStoreReader eventTVar)
+      _ <- writer.storeEvents (uuidFromInteger 1) NoStream [Added 1, Added 2]
+
+      sumRef <- newTVarIO (0 :: Int)
+      checkpointRef <- newTVarIO (0 :: SequenceNumber)
+      let rm =
+            ReadModel
+              { initialize = pure (),
+                eventHandler = EventHandler $ \globalEvent ->
+                  case globalEvent.payload.payload of
+                    Added n -> atomically $ modifyTVar' sumRef (+ n)
+                    _ -> return (),
+                checkpointStore =
+                  CheckpointStore
+                    { getCheckpoint = readTVarIO checkpointRef,
+                      saveCheckpoint = atomically . writeTVar checkpointRef
+                    },
+                -- Clears view DATA only — deliberately does NOT touch the checkpoint.
+                reset = atomically $ writeTVar sumRef 0
+              }
+
+      -- Advance the checkpoint as if previously caught up.
+      catchUpReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 3
+      readTVarIO checkpointRef `shouldReturn` 2
+
+      -- Rebuild must still replay from the start: eventium resets the checkpoint
+      -- even though reset left it at 2.
+      rebuildReadModel globalReader rm
+      readTVarIO sumRef `shouldReturn` 3

@@ -191,23 +191,29 @@ lookupGlobalEvents (QueryRange () start limit) (EventMap _ globalEvents) = event
         (StartQueryAt startSeq) -> startSeq
 
 storeEventMap ::
-  EventMap event -> UUID -> [event] -> (EventMap event, EventVersion)
+  EventMap event -> UUID -> [event] -> (EventMap event, EventWriteResult)
 storeEventMap store@(EventMap uuidMap globalEvents) uuid events =
   let versStart = latestEventVersion store uuid
-      streamEvents = zipWith (\v e -> StreamEvent uuid v (emptyMetadata "") e) [versStart + 1 ..] events
+      vers = take (length events) [versStart + 1 ..]
+      streamEvents = zipWith (\v e -> StreamEvent uuid v (emptyMetadata "") e) vers events
       newMap = Map.insertWith (flip (><)) uuid (Seq.fromList streamEvents) uuidMap
       globalEvents' = globalEvents >< Seq.fromList streamEvents
-   in (EventMap newMap globalEvents', versStart + EventVersion (length events))
+      -- The global reader numbers events 1-based by their position in
+      -- 'globalEvents'; mirror that from the length before appending.
+      globals = take (length events) [SequenceNumber (Seq.length globalEvents + 1) ..]
+   in (EventMap newMap globalEvents', zip vers globals)
 
 storeEventMapTagged ::
-  EventMap event -> UUID -> [TaggedEvent event] -> (EventMap event, EventVersion)
+  EventMap event -> UUID -> [TaggedEvent event] -> (EventMap event, EventWriteResult)
 storeEventMapTagged store@(EventMap uuidMap globalEvents) uuid taggedEvents =
   let versStart = latestEventVersion store uuid
+      vers = take (length taggedEvents) [versStart + 1 ..]
       streamEvents =
         zipWith
           (\v (TaggedEvent meta e) -> StreamEvent uuid v meta e)
-          [versStart + 1 ..]
+          vers
           taggedEvents
       newMap = Map.insertWith (flip (><)) uuid (Seq.fromList streamEvents) uuidMap
       globalEvents' = globalEvents >< Seq.fromList streamEvents
-   in (EventMap newMap globalEvents', versStart + EventVersion (length taggedEvents))
+      globals = take (length taggedEvents) [SequenceNumber (Seq.length globalEvents + 1) ..]
+   in (EventMap newMap globalEvents', zip vers globals)

@@ -22,6 +22,14 @@ module Eventium.Store.Types
     ExpectedPosition (..),
     EventWriteError (..),
 
+    -- * Write result
+    WrittenEventPosition,
+    EventWriteResult,
+    versions,
+    globalPositions,
+    lastVersion,
+    lastPosition,
+
     -- * Utility types
     EventVersion (..),
     SequenceNumber (..),
@@ -29,6 +37,7 @@ module Eventium.Store.Types
 where
 
 import Data.Aeson
+import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Eventium.UUID
@@ -106,6 +115,41 @@ data ExpectedPosition position
 newtype EventWriteError position
   = EventStreamNotAtExpectedVersion position
   deriving (Show, Eq)
+
+-- | A written event's assigned per-stream 'EventVersion' paired with the global
+-- 'SequenceNumber' the store gave it. Pairing version and position per event
+-- (rather than returning two parallel lists) keeps them structurally in sync.
+type WrittenEventPosition = (EventVersion, SequenceNumber)
+
+-- | The outcome of a successful write: one '(EventVersion, SequenceNumber)' per
+-- event written, in write order (so the stream's resulting end version is
+-- @fst (last writeResult)@).
+--
+-- Exposing the assigned global positions lets a synchronous subscriber publish
+-- 'GlobalStreamEvent's with real positions (and advance a 'CheckpointStore' in
+-- the write transaction), rather than fabricating a position. The positions are
+-- assigned under the store's global-ordering guarantee (the PostgreSQL exclusive
+-- lock / SQLite single-writer / memory single-append), so they match what the
+-- global reader derives for the same events.
+type EventWriteResult = [WrittenEventPosition]
+
+-- | All per-stream versions assigned by a write, in write order.
+versions :: EventWriteResult -> [EventVersion]
+versions = map fst
+
+-- | All global positions assigned by a write, in write order.
+globalPositions :: EventWriteResult -> [SequenceNumber]
+globalPositions = map snd
+
+-- | The per-stream end version (the last written event's version), or 'Nothing'
+-- when no events were written.
+lastVersion :: EventWriteResult -> Maybe EventVersion
+lastVersion = fmap (fst . NE.last) . NE.nonEmpty
+
+-- | The last (highest) global position assigned, or 'Nothing' when no events
+-- were written. Handy for advancing a 'Eventium.EventSubscription.CheckpointStore'.
+lastPosition :: EventWriteResult -> Maybe SequenceNumber
+lastPosition = fmap (snd . NE.last) . NE.nonEmpty
 
 -- | Event versions are a strictly increasing series of integers for each
 -- projection. They allow us to order the events when they are replayed, and

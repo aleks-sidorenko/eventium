@@ -155,15 +155,16 @@ sqlStoreEvents ::
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->
   [serialized] ->
-  SqlPersistT m EventVersion
+  SqlPersistT m EventWriteResult
 sqlStoreEvents config mLockCommand maxVersionSql uid events = do
   versionNum <- sqlMaxEventVersion config maxVersionSql uid
-  let entities = zipWith (\v e -> config.sequenceMakeEntity uid v e Nothing) [versionNum + 1 ..] events
+  let vers = take (length events) [versionNum + 1 ..]
+      entities = zipWith (\v e -> config.sequenceMakeEntity uid v e Nothing) vers events
   -- NB: We need to take a lock on the events table or else the global sequence
   -- numbers may not increase monotonically over time.
   for_ mLockCommand $ \lockCommand -> rawExecute (lockCommand tableName) []
-  _ <- insertMany entities
-  return $ versionNum + EventVersion (length events)
+  keys <- insertMany entities
+  return $ zip vers (map config.unKey keys)
   where
     tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
 
@@ -176,10 +177,11 @@ sqlStoreEventsTagged ::
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->
   [TaggedEvent serialized] ->
-  SqlPersistT m EventVersion
+  SqlPersistT m EventWriteResult
 sqlStoreEventsTagged config mLockCommand maxVersionSql uid taggedEvents = do
   versionNum <- sqlMaxEventVersion config maxVersionSql uid
-  let entities =
+  let vers = take (length taggedEvents) [versionNum + 1 ..]
+      entities =
         zipWith
           ( \v (TaggedEvent meta e) ->
               config.sequenceMakeEntity
@@ -188,11 +190,11 @@ sqlStoreEventsTagged config mLockCommand maxVersionSql uid taggedEvents = do
                 e
                 (Just $ encodeJSON meta)
           )
-          [versionNum + 1 ..]
+          vers
           taggedEvents
   for_ mLockCommand $ \lockCommand -> rawExecute (lockCommand tableName) []
-  _ <- insertMany entities
-  return $ versionNum + EventVersion (length taggedEvents)
+  keys <- insertMany entities
+  return $ zip vers (map config.unKey keys)
   where
     tableName = unEntityNameDB $ tableDBName (config.sequenceMakeEntity nil 0 undefined Nothing)
 

@@ -91,9 +91,14 @@ applyCommandHandlerWithCache writer reader cache cmdHandler uuid command = do
       result <- writer.storeEvents uuid (ExactPosition sp.position) events
       case result of
         Left writeErr -> return $ Left (ConcurrencyConflict writeErr)
-        Right endVersion -> do
-          let newState = foldl' cmdHandler.projection.eventHandler sp.state events
-          cache.storeSnapshot uuid endVersion newState
+        Right writeResult -> do
+          -- Refresh the snapshot only when events were actually written; the
+          -- end version is the last written event's per-stream version.
+          case lastVersion writeResult of
+            Nothing -> return ()
+            Just endV -> do
+              let newState = foldl' cmdHandler.projection.eventHandler sp.state events
+              cache.storeSnapshot uuid endV newState
           return $ Right events
 
 -- | Use a pair of 'Codec's to wrap a 'CommandHandler' with event type

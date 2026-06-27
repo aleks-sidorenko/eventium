@@ -1,5 +1,44 @@
 # eventium Changelog
 
+## 0.4.0
+
+### Breaking
+
+- **`EventStoreWriter` now reports the assigned global positions.** A successful
+  write returns `EventWriteResult` (`= [(EventVersion, SequenceNumber)]`, one pair per
+  event in write order) instead of just the end `EventVersion`. This exposes the
+  real global `SequenceNumber`s the store assigns, so a synchronous subscriber can
+  publish `GlobalStreamEvent`s with true positions and advance a `CheckpointStore`
+  in the write transaction. `transactionalExpectedWriteHelper`'s store callback
+  and all backend writers (postgresql, sqlite, memory) change accordingly.
+  Accessors `versions`, `globalPositions`, `lastVersion`, `lastPosition` are
+  provided on `EventWriteResult`.
+
+### Additions
+
+- **Global publishing** (`eventium-core`, `Eventium.EventPublisher`):
+  - `GlobalEventPublisher` (with `Semigroup`/`Monoid`) — publishes
+    `GlobalStreamEvent`s carrying real `SequenceNumber`s.
+  - `publishingGlobalEventStoreWriter` / `publishingGlobalTaggedCodecEventStoreWriter`
+    — wrap a writer to publish global events from the `EventWriteResult`.
+  - `synchronousGlobalPublisher`, and `globalToVersionedHandler` to lift existing
+    `VersionedStreamEvent` handlers (process managers, loggers) into a global
+    publisher.
+- **Dual-mode read models** (`eventium-core`, `Eventium.ReadModel`):
+  - `readModelPublisher` — drive a `ReadModel` *synchronously* in the write
+    transaction (apply handler + advance checkpoint), the counterpart to the async
+    `runReadModel`. The same `ReadModel` value runs in either mode.
+  - `catchUpReadModel` — one-shot catch-up from the current checkpoint *without*
+    resetting (the startup/backfill counterpart; `rebuildReadModel` is now
+    `reset` then `catchUpReadModel`).
+  - `rebuildReadModel` now resets the checkpoint itself, so a `ReadModel`'s
+    `reset` need only drop its view data (tables) — it no longer has to remember
+    to zero the checkpoint. (Fixes a footgun where a `reset` that cleared data but
+    not the checkpoint made `rebuildReadModel` replay from a stale position and
+    project nothing.)
+- **Testkit**: the shared store spec now asserts write-assigned global positions
+  match the global reader's, on every backend.
+
 ## 0.2.1 (Unreleased)
 
 ### Additions

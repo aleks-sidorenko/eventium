@@ -235,7 +235,8 @@ eventStoreSpec (EventStoreRunner withStore) = do
       err2 `shouldBe` Left (EventStreamNotAtExpectedVersion (-1))
 
     it "should be able to store events starting with an empty stream" $ do
-      withStore (\writer _ -> writer.storeEvents nil NoStream [Added 1]) `shouldReturn` Right 0
+      result <- withStore (\writer _ -> writer.storeEvents nil NoStream [Added 1])
+      fmap lastVersion result `shouldBe` Right (Just 0)
 
     it "should reject storing events sometimes with a stream" $ do
       (err1, err2, err3) <- withStore $ \writer _ ->
@@ -243,7 +244,7 @@ eventStoreSpec (EventStoreRunner withStore) = do
           <$> writer.storeEvents nil NoStream [Added 1]
           <*> writer.storeEvents nil NoStream [Added 1]
           <*> writer.storeEvents nil (ExactPosition 1) [Added 1]
-      err1 `shouldBe` Right 0
+      fmap lastVersion err1 `shouldBe` Right (Just 0)
       err2 `shouldBe` Left (EventStreamNotAtExpectedVersion 0)
       err3 `shouldBe` Left (EventStreamNotAtExpectedVersion 0)
 
@@ -255,7 +256,7 @@ eventStoreSpec (EventStoreRunner withStore) = do
             writer.storeEvents nil (ExactPosition 1) [Added 1],
             writer.storeEvents nil StreamExists [Added 1]
           ]
-      errors `shouldBe` [Right 0, Right 1, Right 2, Right 3]
+      map (fmap lastVersion) errors `shouldBe` [Right (Just 0), Right (Just 1), Right (Just 2), Right (Just 3)]
 
 newtype GlobalStreamEventStoreRunner m
   = GlobalStreamEventStoreRunner
@@ -280,6 +281,22 @@ globalStreamEventStoreSpec (GlobalStreamEventStoreRunner withStore) = do
       ((\e -> e.payload.key) <$> events) `shouldBe` [uuid1, uuid2, uuid2, uuid1, uuid2]
       ((\e -> e.payload.position) <$> events) `shouldBe` [0, 0, 1, 1, 2]
       ((.position) <$> events) `shouldBe` [1 .. 5]
+
+    it "assigns write-time global positions that match the global reader" $ do
+      (assigned, readPositions) <- withStore $ \writer globalReader -> do
+        rs <-
+          sequence
+            [ writer.storeEvents uuid1 NoStream [Added 1],
+              writer.storeEvents uuid2 NoStream [Added 2, Added 3],
+              writer.storeEvents uuid1 (ExactPosition 0) [Added 4],
+              writer.storeEvents uuid2 (ExactPosition 1) [Added 5]
+            ]
+        events <- globalReader.getEvents (allEvents ())
+        -- Positions the writer reported, in write order, vs. positions the
+        -- global reader derives for the same events.
+        pure (concatMap (either (const []) globalPositions) rs, (.position) <$> events)
+      assigned `shouldBe` readPositions
+      assigned `shouldBe` [1 .. 5]
 
     it "should work with global projections" $ do
       (proj1, proj2) <- withStore $ \writer globalReader -> do
