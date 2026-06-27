@@ -5,14 +5,14 @@
 ### Breaking
 
 - **`EventStoreWriter` now reports the assigned global positions.** A successful
-  write returns `WriteResult` (`= [(EventVersion, SequenceNumber)]`, one pair per
+  write returns `EventWriteResult` (`= [(EventVersion, SequenceNumber)]`, one pair per
   event in write order) instead of just the end `EventVersion`. This exposes the
   real global `SequenceNumber`s the store assigns, so a synchronous subscriber can
   publish `GlobalStreamEvent`s with true positions and advance a `CheckpointStore`
   in the write transaction. `transactionalExpectedWriteHelper`'s store callback
   and all backend writers (postgresql, sqlite, memory) change accordingly.
   Accessors `versions`, `globalPositions`, `lastVersion`, `lastPosition` are
-  provided on `WriteResult`.
+  provided on `EventWriteResult`.
 
 ### Additions
 
@@ -20,7 +20,7 @@
   - `GlobalEventPublisher` (with `Semigroup`/`Monoid`) — publishes
     `GlobalStreamEvent`s carrying real `SequenceNumber`s.
   - `publishingGlobalEventStoreWriter` / `publishingGlobalTaggedCodecEventStoreWriter`
-    — wrap a writer to publish global events from the `WriteResult`.
+    — wrap a writer to publish global events from the `EventWriteResult`.
   - `synchronousGlobalPublisher`, and `globalToVersionedHandler` to lift existing
     `VersionedStreamEvent` handlers (process managers, loggers) into a global
     publisher.

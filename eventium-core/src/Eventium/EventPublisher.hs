@@ -111,7 +111,7 @@ publishingTaggedCodecEventStoreWriter codec (EventStoreWriter write) (EventPubli
 -- real global 'SequenceNumber' — to consumers after a successful write.
 --
 -- Unlike 'EventPublisher' (which only knows per-stream versions), this uses the
--- 'WriteResult' to deliver the true global positions, so a synchronous
+-- 'EventWriteResult' to deliver the true global positions, so a synchronous
 -- subscriber (e.g. a 'Eventium.ReadModel.ReadModel' driven in the write
 -- transaction) sees the same positions the global reader would.
 newtype GlobalEventPublisher m event = GlobalEventPublisher
@@ -143,11 +143,11 @@ globalToVersionedHandler ::
   EventHandler m (GlobalStreamEvent event)
 globalToVersionedHandler = contramap (.payload)
 
--- | Build a 'GlobalStreamEvent' for each written event from the 'WriteResult'
+-- | Build a 'GlobalStreamEvent' for each written event from the 'EventWriteResult'
 -- (its per-stream version + assigned global position) and its payload.
 toGlobalStreamEvents ::
   UUID ->
-  WriteResult ->
+  EventWriteResult ->
   (a -> (EventMetadata, event)) ->
   [a] ->
   [GlobalStreamEvent event]

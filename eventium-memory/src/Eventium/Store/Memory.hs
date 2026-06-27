@@ -191,7 +191,7 @@ lookupGlobalEvents (QueryRange () start limit) (EventMap _ globalEvents) = event
         (StartQueryAt startSeq) -> startSeq
 
 storeEventMap ::
-  EventMap event -> UUID -> [event] -> (EventMap event, WriteResult)
+  EventMap event -> UUID -> [event] -> (EventMap event, EventWriteResult)
 storeEventMap store@(EventMap uuidMap globalEvents) uuid events =
   let versStart = latestEventVersion store uuid
       vers = take (length events) [versStart + 1 ..]
@@ -204,7 +204,7 @@ storeEventMap store@(EventMap uuidMap globalEvents) uuid events =
    in (EventMap newMap globalEvents', zip vers globals)
 
 storeEventMapTagged ::
-  EventMap event -> UUID -> [TaggedEvent event] -> (EventMap event, WriteResult)
+  EventMap event -> UUID -> [TaggedEvent event] -> (EventMap event, EventWriteResult)
 storeEventMapTagged store@(EventMap uuidMap globalEvents) uuid taggedEvents =
   let versStart = latestEventVersion store uuid
       vers = take (length taggedEvents) [versStart + 1 ..]

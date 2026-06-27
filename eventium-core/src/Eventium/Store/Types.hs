@@ -24,7 +24,7 @@ module Eventium.Store.Types
 
     -- * Write result
     WrittenEventPosition,
-    WriteResult,
+    EventWriteResult,
     versions,
     globalPositions,
     lastVersion,
@@ -131,24 +131,24 @@ type WrittenEventPosition = (EventVersion, SequenceNumber)
 -- assigned under the store's global-ordering guarantee (the PostgreSQL exclusive
 -- lock / SQLite single-writer / memory single-append), so they match what the
 -- global reader derives for the same events.
-type WriteResult = [WrittenEventPosition]
+type EventWriteResult = [WrittenEventPosition]
 
 -- | All per-stream versions assigned by a write, in write order.
-versions :: WriteResult -> [EventVersion]
+versions :: EventWriteResult -> [EventVersion]
 versions = map fst
 
 -- | All global positions assigned by a write, in write order.
-globalPositions :: WriteResult -> [SequenceNumber]
+globalPositions :: EventWriteResult -> [SequenceNumber]
 globalPositions = map snd
 
 -- | The per-stream end version (the last written event's version), or 'Nothing'
 -- when no events were written.
-lastVersion :: WriteResult -> Maybe EventVersion
+lastVersion :: EventWriteResult -> Maybe EventVersion
 lastVersion = fmap (fst . NE.last) . NE.nonEmpty
 
 -- | The last (highest) global position assigned, or 'Nothing' when no events
 -- were written. Handy for advancing a 'Eventium.EventSubscription.CheckpointStore'.
-lastPosition :: WriteResult -> Maybe SequenceNumber
+lastPosition :: EventWriteResult -> Maybe SequenceNumber
 lastPosition = fmap (snd . NE.last) . NE.nonEmpty
 
 -- | Event versions are a strictly increasing series of integers for each

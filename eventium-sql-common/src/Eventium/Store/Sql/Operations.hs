@@ -155,7 +155,7 @@ sqlStoreEvents ::
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->
   [serialized] ->
-  SqlPersistT m WriteResult
+  SqlPersistT m EventWriteResult
 sqlStoreEvents config mLockCommand maxVersionSql uid events = do
   versionNum <- sqlMaxEventVersion config maxVersionSql uid
   let vers = take (length events) [versionNum + 1 ..]
@@ -177,7 +177,7 @@ sqlStoreEventsTagged ::
   (FieldNameDB -> FieldNameDB -> FieldNameDB -> Text) ->
   UUID ->
   [TaggedEvent serialized] ->
-  SqlPersistT m WriteResult
+  SqlPersistT m EventWriteResult
 sqlStoreEventsTagged config mLockCommand maxVersionSql uid taggedEvents = do
   versionNum <- sqlMaxEventVersion config maxVersionSql uid
   let vers = take (length taggedEvents) [versionNum + 1 ..]
