@@ -35,9 +35,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Functor ((<&>))
 import Data.Functor.Contravariant
 import Data.Maybe (mapMaybe)
-import qualified Data.Text as T
 import Data.Time (UTCTime, getCurrentTime)
-import Data.Typeable (Typeable, typeOf)
+import Data.Typeable (Typeable)
 import Eventium.Codec
 import Eventium.Store.Queries
 import Eventium.Store.Types
@@ -200,7 +199,7 @@ metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter w
           map
             ( \e ->
                 TaggedEvent
-                  (enricher (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now)))
+                  (enricher (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now)))
                   (codec.encode e)
             )
             events
@@ -217,7 +216,7 @@ tagEvents ::
 tagEvents codec now =
   map $ \e ->
     TaggedEvent
-      (EventMetadata (T.pack . show $ typeOf e) Nothing Nothing (Just now))
+      (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now))
       (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of

@@ -13,6 +13,7 @@ import Eventium.ProcessManager as X
 import Eventium.Projection as X
 import Eventium.ProjectionCache.Cache as X
 import Eventium.ReadModel as X
+import Eventium.SchemaEvolution as X
 import Eventium.Store.Class as X
 import Eventium.TypeEmbedding as X
 import Eventium.UUID as X

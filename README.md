@@ -10,7 +10,7 @@ Eventium provides composable, type-safe abstractions for event sourcing: event s
 
 | Package                 | Description                                                                                            |
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| **eventium-core**       | Core abstractions: event stores, projections, command handlers, process managers, codecs, TH utilities |
+| **eventium-core**       | Core abstractions: event stores, projections, command handlers, process managers, codecs, schema evolution, TH utilities |
 | **eventium-memory**     | STM-based in-memory event store for development and testing                                            |
 | **eventium-sqlite**     | SQLite backend via `persistent`                                                                        |
 | **eventium-postgresql** | PostgreSQL backend via `persistent`                                                                    |
@@ -72,6 +72,7 @@ main = do
 - **EventPublisher** -- Decouples post-write notification from the store writer. `publishingEventStoreWriter` wraps a writer to auto-dispatch after each write.
 - **EventSubscription** -- Push-based event delivery. `pollingSubscription` polls the global stream at a configurable interval.
 - **Codec** -- Bidirectional event encoding/decoding with JSON support and TH-generated sum-type codecs.
+- **SchemaEvolution** -- Upcast-on-read event schema evolution against an immutable log: a versioned payload envelope plus a registry of pure single-hop upcasters (`atKey`, `addFieldIfAbsent`, `renameField`, `removeField`). `upcastingValueCodec` normalizes older stored events to the current shape on read without ever rewriting the log; version-skipping runs more hops.
 
 ## Examples
 

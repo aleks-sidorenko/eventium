@@ -1,5 +1,51 @@
 # eventium Changelog
 
+## 0.5.2
+
+### Added
+
+- **`eventTypeName` / `eventTypeNameOf`** (`Eventium.Store.Types`) — derive an
+  `EventTypeName` from a type (`eventTypeName @MyEvent`) or a value
+  (`eventTypeNameOf e`) via `Typeable`. Removes the `show . typeOf` boilerplate:
+  clients keying a `SchemaRegistry` no longer write string literals, and the
+  metadata-enriching writers (`Eventium.Store.Class`) now use it internally.
+
+## 0.5.1
+
+### Changed
+
+- **Schema evolution module layout** now follows the library's @*.Types@ + instance
+  convention. `Eventium.SchemaEvolution` is a re-export entry point;
+  `Eventium.SchemaEvolution.Types` holds the representation-agnostic core
+  (`SchemaRegistry`, `registerUpcasters`, `currentVersion`, `upcast`, `Upcaster`);
+  `Eventium.SchemaEvolution.Json` holds the JSON instance (envelope, field
+  combinators, `upcastingValueCodec`). Importing `Eventium.SchemaEvolution` still
+  surfaces everything; import a submodule to limit scope.
+
+## 0.5.0
+
+### Additions
+
+- **Event schema evolution (`Eventium.SchemaEvolution`)** — upcast-on-read against
+  an immutable log, so a released app can change a stored event type's shape
+  without breaking replay of older events. Stored bytes are never mutated.
+  - Versioned envelope `{ "schemaVersion": N, "payload": <event-json> }`.
+    Pre-envelope data (no `schemaVersion` key) is read as version 1.
+  - `SchemaRegistry` of pure single-hop upcasters keyed by `EventTypeName`,
+    ordered `[v1→v2, v2→v3, …]`; current version is `1 + length`. Version-skipping
+    runs more hops.
+  - `upcastingValueCodec eventTypeOf registry` — a drop-in `Codec a Value` that
+    wraps the current-version envelope on encode and normalizes older events on
+    decode. Serves every event type and backend, sync and async consumers, with a
+    one-line call-site swap.
+  - Upcaster combinators: `atKey`, `addFieldIfAbsent`, `renameField`,
+    `removeField` — build field-level transforms without hand-rolled `KeyMap`
+    manipulation.
+- **`upcastingJsonStringCodec` (`eventium-sql-common`)** — the `Codec a JSONString`
+  drop-in for `jsonStringCodec` at SQL reader/writer call sites.
+- **`EventTypeName`** type alias (`Eventium.Store.Types`), shared by
+  `EventMetadata.eventType` and the schema registry.
+
 ## 0.4.0
 
 ### Breaking
