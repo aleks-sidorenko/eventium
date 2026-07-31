@@ -22,13 +22,13 @@ build: hpack
     @echo "✓ Build complete"
 
 # Run all tests
-test:
+test: build
     @echo "Running tests..."
     cabal test all --test-show-details=direct --enable-tests
     @echo "✓ Tests complete"
 
 # Run tests with coverage
-test-coverage:
+test-coverage: build
     @echo "Running tests with coverage..."
     cabal test all --enable-coverage --test-show-details=direct --enable-tests
 
@@ -150,5 +150,5 @@ ci:
 # --- Hackage ---
 
 # Publish to Hackage (candidate by default, use --publish to publish for real)
-publish *ARGS:
+publish *ARGS: build
     ./scripts/publish.sh {{ARGS}}
