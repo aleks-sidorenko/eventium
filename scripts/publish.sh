@@ -161,7 +161,7 @@ if [ "$UPLOAD_DOCS" = "true" ]; then
     for doc_tarball in $DOC_FILES; do
       echo "  Uploading $(basename "$doc_tarball")..."
       if cabal upload -d --publish --token "$HACKAGE_TOKEN" "$doc_tarball"; then
-        ((DOC_COUNT++))
+        DOC_COUNT=$((DOC_COUNT + 1))
       else
         echo "  ⚠️  Failed to upload $(basename "$doc_tarball")"
       fi
