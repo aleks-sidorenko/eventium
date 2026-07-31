@@ -1,6 +1,9 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Pure data types for the event store. These types have no dependency on
 -- any monad or effect system. They are extracted from "Eventium.Store.Class"
@@ -13,6 +16,9 @@ module Eventium.Store.Types
     GlobalStreamEvent,
 
     -- * Event metadata
+    EventTypeName,
+    eventTypeName,
+    eventTypeNameOf,
     EventMetadata (..),
     emptyMetadata,
     MetadataEnricher,
@@ -38,16 +44,34 @@ where
 
 import Data.Aeson
 import qualified Data.List.NonEmpty as NE
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.Time (UTCTime)
 import Eventium.UUID
 import GHC.Generics (Generic)
+import Type.Reflection (Typeable, typeRep)
 import Web.HttpApiData
 import Web.PathPieces
 
+-- | A name identifying an event type — e.g. the type name recorded in
+-- 'EventMetadata', or the discriminator tag an app uses to key its schema
+-- evolution registry (see "Eventium.SchemaEvolution").
+type EventTypeName = Text
+
+-- | The 'EventTypeName' of an event type: its unqualified type name, derived
+-- from 'Typeable'. Use when you have the type but no value — e.g. keying a
+-- schema-evolution registry: @eventTypeName \@MyEvent@.
+eventTypeName :: forall a. (Typeable a) => EventTypeName
+eventTypeName = pack (show (typeRep @a))
+
+-- | 'eventTypeName' for the type of a value. Handy at write time, where an
+-- event value is in hand (e.g. deriving 'EventMetadata.eventType'). The value
+-- is inspected only for its type.
+eventTypeNameOf :: forall a. (Typeable a) => a -> EventTypeName
+eventTypeNameOf _ = eventTypeName @a
+
 -- | Metadata carried alongside every stored event.
 data EventMetadata = EventMetadata
-  { eventType :: !Text,
+  { eventType :: !EventTypeName,
     correlationId :: !(Maybe UUID),
     causationId :: !(Maybe UUID),
     createdAt :: !(Maybe UTCTime)
