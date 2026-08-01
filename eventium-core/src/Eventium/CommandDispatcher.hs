@@ -11,6 +11,7 @@ module Eventium.CommandDispatcher
     mkAggregateHandler,
     mkAggregateHandlerWith,
     commandHandlerDispatcher,
+    commandHandlerDispatcherWithTag,
   )
 where
 
@@ -20,8 +21,8 @@ import Data.Typeable (Typeable)
 import Eventium.Codec (Codec)
 import Eventium.CommandHandler (CommandHandler, CommandHandlerError (..), applyCommandHandler)
 import Eventium.ProcessManager (CommandDispatchResult (..), CommandDispatcher (..), RejectionReason (..))
-import Eventium.Store.Class (EventStoreWriter, VersionedEventStoreReader, metadataEnrichingEventStoreWriterWithEnricher)
-import Eventium.Store.Types (EventVersion, TaggedEvent)
+import Eventium.Store.Class (EventStoreWriter, VersionedEventStoreReader, metadataEnrichingEventStoreWriterWithTag)
+import Eventium.Store.Types (EventTypeName, EventVersion, TaggedEvent, eventTypeNameOf)
 import Eventium.UUID (UUID)
 
 -- | An embedded command handler paired with an error formatter.
@@ -61,6 +62,11 @@ mkAggregateHandlerWith fmt h = AggregateHandler h fmt
 --   * @Right []@ — command did not match this handler → try next
 --
 -- If no handler matches (all return @Right []@), reports 'CommandSucceeded' (no-op).
+--
+-- Tags each emitted event's 'EventMetadata.eventType' via 'Typeable'. If the
+-- event type is an application-wide sum (e.g. @AccountingEvent@) whose
+-- Typeable name isn't the useful discriminator, use
+-- 'commandHandlerDispatcherWithTag' instead.
 commandHandlerDispatcher ::
   (MonadIO m, Typeable event) =>
   Codec event encoded ->
@@ -68,9 +74,26 @@ commandHandlerDispatcher ::
   VersionedEventStoreReader m event ->
   [AggregateHandler event command] ->
   CommandDispatcher m command
-commandHandlerDispatcher codec taggedWriter reader handlers =
+commandHandlerDispatcher = commandHandlerDispatcherWithTag eventTypeNameOf
+
+-- | Like 'commandHandlerDispatcher' but the caller supplies the
+-- 'EventTypeName' per event (instead of deriving it from 'Typeable'). Use
+-- when the event is a wrapper sum whose Typeable name isn't the useful
+-- discriminator — e.g. an application-wide event sum type such as
+-- @AccountingEvent@, where every value shares the same Typeable name
+-- regardless of which case it wraps. This matters for saga/process-manager
+-- emitted events, which are routed through this dispatcher.
+commandHandlerDispatcherWithTag ::
+  (MonadIO m) =>
+  (event -> EventTypeName) ->
+  Codec event encoded ->
+  EventStoreWriter UUID EventVersion m (TaggedEvent encoded) ->
+  VersionedEventStoreReader m event ->
+  [AggregateHandler event command] ->
+  CommandDispatcher m command
+commandHandlerDispatcherWithTag tagOf codec taggedWriter reader handlers =
   CommandDispatcher $ \uuid cmd enricher ->
-    let writer = metadataEnrichingEventStoreWriterWithEnricher enricher codec taggedWriter
+    let writer = metadataEnrichingEventStoreWriterWithTag tagOf enricher codec taggedWriter
      in go handlers writer uuid cmd
   where
     go [] _ _ _ = pure CommandSucceeded

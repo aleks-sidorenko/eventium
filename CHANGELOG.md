@@ -15,6 +15,8 @@
 - **`metadataEnrichingEventStoreWriterWithTag`** — caller-supplied per-event
   `EventTypeName` (for wrapper-sum events whose Typeable name isn't the useful
   discriminator).
+- **`commandHandlerDispatcherWithTag`** — caller-supplied per-event
+  `EventTypeName` for dispatcher/saga-emitted events.
 
 ### Changed
 

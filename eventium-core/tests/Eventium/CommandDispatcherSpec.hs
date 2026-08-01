@@ -60,6 +60,34 @@ mkTestStore = do
     filterByQuery (QueryRange uuid _ _) =
       filter (\(StreamEvent k _ _ _) -> k == uuid)
 
+-- | Like 'mkTestStore', but also captures every 'TaggedEvent' passed to the
+-- writer (metadata included) so tests can assert on the tag actually used.
+mkCapturingTestStore ::
+  IO
+    ( IORef [TaggedEvent CounterEvent],
+      VersionedEventStoreWriter IO (TaggedEvent CounterEvent),
+      VersionedEventStoreReader IO CounterEvent
+    )
+mkCapturingTestStore = do
+  eventsRef <- newIORef ([] :: [VersionedStreamEvent CounterEvent])
+  capturedRef <- newIORef ([] :: [TaggedEvent CounterEvent])
+  let taggedWriter = EventStoreWriter $ \uuid _expected taggedEvents -> do
+        modifyIORef capturedRef (++ taggedEvents)
+        existing <- readIORef eventsRef
+        let events = map (.payload) taggedEvents
+            startVersion = fromIntegral (length existing)
+            versioned = zipWith (\i e -> StreamEvent uuid i (emptyMetadata "") e) [startVersion ..] events
+            poss = take (length events) [SequenceNumber (length existing + 1) ..]
+        modifyIORef eventsRef (++ versioned)
+        pure (Right (zip [startVersion ..] poss))
+      reader = EventStoreReader $ \query -> do
+        allEvts <- readIORef eventsRef
+        pure $ filterByQuery query allEvts
+  pure (capturedRef, taggedWriter, reader)
+  where
+    filterByQuery (QueryRange uuid _ _) =
+      filter (\(StreamEvent k _ _ _) -> k == uuid)
+
 spec :: Spec
 spec = describe "CommandDispatcher" $ do
   describe "commandHandlerDispatcher" $ do
@@ -91,3 +119,27 @@ spec = describe "CommandDispatcher" $ do
       -- Unknown returns Right [], so no handler "matches" (produces events)
       result <- dispatcher.dispatchCommand (uuidFromInteger 1) Unknown id
       result `shouldBe` CommandSucceeded
+
+    it "tags emitted events with the Typeable event type name" $ do
+      (capturedRef, taggedWriter, reader) <- mkCapturingTestStore
+
+      let handlers = [mkAggregateHandler counterHandler]
+          dispatcher = commandHandlerDispatcher testCodec taggedWriter reader handlers
+
+      _ <- dispatcher.dispatchCommand (uuidFromInteger 1) Increment id
+      captured <- readIORef capturedRef
+      map (.metadata.eventType) captured `shouldBe` ["CounterEvent"]
+
+  describe "commandHandlerDispatcherWithTag" $ do
+    it "tags emitted events with the caller-supplied event type name" $ do
+      (capturedRef, taggedWriter, reader) <- mkCapturingTestStore
+
+      let handlers = [mkAggregateHandler counterHandler]
+          dispatcher =
+            commandHandlerDispatcherWithTag (const "SpecificTag") testCodec taggedWriter reader handlers
+
+      result <- dispatcher.dispatchCommand (uuidFromInteger 1) Increment id
+      result `shouldBe` CommandSucceeded
+
+      captured <- readIORef capturedRef
+      map (.metadata.eventType) captured `shouldBe` ["SpecificTag"]
