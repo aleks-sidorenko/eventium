@@ -9,11 +9,9 @@ import Test.Hspec
 
 spec :: Spec
 spec = describe "Telemetry" $ do
-  it "silentTelemetry emits nothing" $ do
-    ref <- newIORef (0 :: Int)
+  it "silentTelemetry emits nothing (runs cleanly, returns unit)" $ do
     let t = silentTelemetry :: Telemetry IO
-    t.emit (EventsPersisted (StreamKeyText "s") [emptyMetadata "Foo"] [])
-    readIORef ref `shouldReturn` 0
+    t.emit (EventsPersisted (StreamKeyText "s") [emptyMetadata "Foo"] []) `shouldReturn` ()
 
   it "a capturing sink records the signal it is given" $ do
     ref <- newIORef []
