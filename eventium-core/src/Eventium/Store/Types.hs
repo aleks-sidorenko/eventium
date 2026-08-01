@@ -1,5 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -51,7 +50,6 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text, pack)
 import Data.Time (UTCTime)
 import Eventium.UUID
-import GHC.Generics (Generic)
 import Type.Reflection (Typeable, typeRep)
 import Web.HttpApiData
 import Web.PathPieces
@@ -81,7 +79,7 @@ data EventMetadata = EventMetadata
     createdAt :: !(Maybe UTCTime),
     custom :: !(Map Text Text)
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq)
 
 instance ToJSON EventMetadata where
   toJSON md =
