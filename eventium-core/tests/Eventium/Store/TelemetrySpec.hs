@@ -52,9 +52,10 @@ spec = describe "telemetryEventStoreWriter" $ do
     _ <- (telemetryEventStoreWriter t inner).storeEvents key (ExactPosition (EventVersion 3)) ([] :: [TaggedEvent Text])
     readIORef ref `shouldReturn` []
 
-  it "silentTelemetry emits nothing" $ do
+  it "silentTelemetry emits nothing and passes the result through" $ do
     (ref, _) <- capturing
     let wr = [(EventVersion 1, SequenceNumber 10)]
     let inner = EventStoreWriter (\_ _ _ -> pure (Right wr))
-    _ <- (telemetryEventStoreWriter silentTelemetry inner).storeEvents key AnyPosition [ev]
+    r <- (telemetryEventStoreWriter silentTelemetry inner).storeEvents key AnyPosition [ev]
+    r `shouldBe` Right wr
     readIORef ref `shouldReturn` []
