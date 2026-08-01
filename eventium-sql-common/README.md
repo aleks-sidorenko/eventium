@@ -33,7 +33,6 @@ non-tagged writer path):
 {
   "eventType": "AccountOpened",
   "correlationId": "550e8400-...",
-  "causationId": null,
   "createdAt": "2026-02-27T12:00:00Z"
 }
 ```

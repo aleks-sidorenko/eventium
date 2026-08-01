@@ -1,5 +1,25 @@
 # eventium Changelog
 
+## 0.6.0
+
+### Added
+
+- **Telemetry (`Eventium.Telemetry`)** — a generic, framework-free structured
+  sink (`Telemetry m` over a `Signal` sum type) with a `silentTelemetry` no-op
+  default. First subsystem wired: the write path, via
+  `telemetryEventStoreWriter` (`Eventium.Store.Telemetry`), emitting
+  `EventsPersisted` / `WriteConflict`.
+- **`EventMetadata.custom :: Map Text Text`** — a generic per-event context bag
+  (e.g. an app's user id), plus `insertCustomMetadata`. Injected via the existing
+  `MetadataEnricher` seam.
+
+### Changed
+
+- `EventMetadata` JSON now **omits** absent/empty optional fields (the three
+  `Maybe`s and `custom`) instead of emitting explicit `null`. Fully
+  read-compatible: pre-existing rows with explicit `null`s still decode. New
+  writes are leaner and no longer byte-identical to historical rows.
+
 ## 0.5.2
 
 ### Added

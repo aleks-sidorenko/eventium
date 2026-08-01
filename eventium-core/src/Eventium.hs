@@ -15,5 +15,7 @@ import Eventium.ProjectionCache.Cache as X
 import Eventium.ReadModel as X
 import Eventium.SchemaEvolution as X
 import Eventium.Store.Class as X
+import Eventium.Store.Telemetry as X
+import Eventium.Telemetry as X
 import Eventium.TypeEmbedding as X
 import Eventium.UUID as X
