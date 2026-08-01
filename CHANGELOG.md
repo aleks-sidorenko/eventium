@@ -12,6 +12,9 @@
 - **`EventMetadata.custom :: Map Text Text`** — a generic per-event context bag
   (e.g. an app's user id), plus `insertCustomMetadata`. Injected via the existing
   `MetadataEnricher` seam.
+- **`metadataEnrichingEventStoreWriterWithTag`** — caller-supplied per-event
+  `EventTypeName` (for wrapper-sum events whose Typeable name isn't the useful
+  discriminator).
 
 ### Changed
 
