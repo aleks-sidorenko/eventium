@@ -37,14 +37,14 @@ spec = describe "telemetryEventStoreWriter" $ do
     let inner = EventStoreWriter (\_ _ _ -> pure (Right wr))
     _ <- (telemetryEventStoreWriter t inner).storeEvents key AnyPosition [ev]
     signals <- readIORef ref
-    signals `shouldBe` [EventsPersisted (StreamKeyText (UUID.uuidToText key)) [emptyMetadata "Foo"] wr]
+    signals `shouldBe` [EventsPersisted key [emptyMetadata "Foo"] wr]
 
   it "emits WriteConflict on an expected-position failure" $ do
     (ref, t) <- capturing
     let inner = EventStoreWriter (\_ _ _ -> pure (Left (EventStreamNotAtExpectedVersion (EventVersion 7))))
     _ <- (telemetryEventStoreWriter t inner).storeEvents key (ExactPosition (EventVersion 3)) [ev]
     signals <- readIORef ref
-    signals `shouldBe` [WriteConflict (StreamKeyText (UUID.uuidToText key)) (ConflictInfo (ExactPosition (EventVersion 3)) (EventVersion 7))]
+    signals `shouldBe` [WriteConflict key (ConflictInfo (ExactPosition (EventVersion 3)) (EventVersion 7))]
 
   it "emits nothing for an empty batch (even on a Left)" $ do
     (ref, t) <- capturing

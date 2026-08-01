@@ -12,12 +12,11 @@ import Eventium.Store.Types
     TaggedEvent (..),
   )
 import Eventium.Telemetry
-import qualified Eventium.UUID as UUID
 
 -- | Wrap a versioned 'TaggedEvent' writer so it emits 'EventsPersisted' on a
 -- successful write and 'WriteConflict' on an optimistic-concurrency failure.
 -- An empty batch emits nothing. A store-level exception is not reported (the
--- decorator does not bracket).
+-- decorator does not bracket). The stream 'UUID' is carried through as-is.
 telemetryEventStoreWriter ::
   (Monad m) =>
   Telemetry m ->
@@ -28,10 +27,8 @@ telemetryEventStoreWriter telemetry (EventStoreWriter write) =
     result <- write key expectedPos events
     case events of
       [] -> pure ()
-      _ ->
-        let sk = StreamKeyText (UUID.uuidToText key)
-         in case result of
-              Right wr -> telemetry.emit (EventsPersisted sk (map (.metadata) events) wr)
-              Left (EventStreamNotAtExpectedVersion actualPos) ->
-                telemetry.emit (WriteConflict sk (ConflictInfo expectedPos actualPos))
+      _ -> case result of
+        Right wr -> telemetry.emit (EventsPersisted key (map (.metadata) events) wr)
+        Left (EventStreamNotAtExpectedVersion actualPos) ->
+          telemetry.emit (WriteConflict key (ConflictInfo expectedPos actualPos))
     pure result
