@@ -199,7 +199,7 @@ metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter w
           map
             ( \e ->
                 TaggedEvent
-                  (enricher (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now)))
+                  (enricher (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now) mempty))
                   (codec.encode e)
             )
             events
@@ -216,7 +216,7 @@ tagEvents ::
 tagEvents codec now =
   map $ \e ->
     TaggedEvent
-      (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now))
+      (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now) mempty)
       (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of
