@@ -1,7 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -21,6 +21,7 @@ module Eventium.Store.Types
     eventTypeNameOf,
     EventMetadata (..),
     emptyMetadata,
+    insertCustomMetadata,
     MetadataEnricher,
     TaggedEvent (..),
 
@@ -44,10 +45,11 @@ where
 
 import Data.Aeson
 import qualified Data.List.NonEmpty as NE
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text, pack)
 import Data.Time (UTCTime)
 import Eventium.UUID
-import GHC.Generics (Generic)
 import Type.Reflection (Typeable, typeRep)
 import Web.HttpApiData
 import Web.PathPieces
@@ -74,20 +76,37 @@ data EventMetadata = EventMetadata
   { eventType :: !EventTypeName,
     correlationId :: !(Maybe UUID),
     causationId :: !(Maybe UUID),
-    createdAt :: !(Maybe UTCTime)
+    createdAt :: !(Maybe UTCTime),
+    custom :: !(Map Text Text)
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq)
 
 instance ToJSON EventMetadata where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
+  toJSON md =
+    object $
+      ["eventType" .= md.eventType]
+        ++ maybe [] (\v -> ["correlationId" .= v]) md.correlationId
+        ++ maybe [] (\v -> ["causationId" .= v]) md.causationId
+        ++ maybe [] (\v -> ["createdAt" .= v]) md.createdAt
+        ++ ["custom" .= md.custom | not (Map.null md.custom)]
 
 instance FromJSON EventMetadata where
-  parseJSON = genericParseJSON defaultOptions
+  parseJSON = withObject "EventMetadata" $ \o ->
+    EventMetadata
+      <$> o .: "eventType"
+      <*> o .:? "correlationId"
+      <*> o .:? "causationId"
+      <*> o .:? "createdAt"
+      <*> o .:? "custom" .!= mempty
 
 -- | Construct 'EventMetadata' with only an event type name.
 emptyMetadata :: Text -> EventMetadata
-emptyMetadata et = EventMetadata et Nothing Nothing Nothing
+emptyMetadata et = EventMetadata et Nothing Nothing Nothing mempty
+
+-- | Insert one key/value into an event's 'custom' context map.
+-- @insertCustomMetadata "userId" uid@.
+insertCustomMetadata :: Text -> Text -> EventMetadata -> EventMetadata
+insertCustomMetadata k v md = md {custom = Map.insert k v md.custom}
 
 -- | Builder function for customizing event metadata.
 --

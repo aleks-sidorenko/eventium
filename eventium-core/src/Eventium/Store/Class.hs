@@ -20,6 +20,7 @@ module Eventium.Store.Class
     codecEventStoreWriter,
     metadataEnrichingEventStoreWriter,
     metadataEnrichingEventStoreWriterWithEnricher,
+    metadataEnrichingEventStoreWriterWithTag,
     tagEvents,
 
     -- * Type embedding
@@ -192,14 +193,29 @@ metadataEnrichingEventStoreWriterWithEnricher ::
   Codec event encoded ->
   EventStoreWriter key position m (TaggedEvent encoded) ->
   EventStoreWriter key position m event
-metadataEnrichingEventStoreWriterWithEnricher enricher codec (EventStoreWriter write) =
+metadataEnrichingEventStoreWriterWithEnricher = metadataEnrichingEventStoreWriterWithTag eventTypeNameOf
+
+-- | Like 'metadataEnrichingEventStoreWriterWithEnricher' but the caller
+-- supplies the 'EventTypeName' per event (instead of deriving it from
+-- 'Typeable'). Use when the event is a wrapper sum whose Typeable name
+-- isn't the useful discriminator — e.g. an application-wide event sum
+-- type such as @AccountingEvent@, where every value shares the same
+-- Typeable name regardless of which case it wraps.
+metadataEnrichingEventStoreWriterWithTag ::
+  (MonadIO m) =>
+  (event -> EventTypeName) ->
+  MetadataEnricher ->
+  Codec event encoded ->
+  EventStoreWriter key position m (TaggedEvent encoded) ->
+  EventStoreWriter key position m event
+metadataEnrichingEventStoreWriterWithTag tagOf enricher codec (EventStoreWriter write) =
   EventStoreWriter $ \key pos events -> do
     now <- liftIO getCurrentTime
     let tagged =
           map
             ( \e ->
                 TaggedEvent
-                  (enricher (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now)))
+                  (enricher (EventMetadata (tagOf e) Nothing Nothing (Just now) mempty))
                   (codec.encode e)
             )
             events
@@ -216,7 +232,7 @@ tagEvents ::
 tagEvents codec now =
   map $ \e ->
     TaggedEvent
-      (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now))
+      (EventMetadata (eventTypeNameOf e) Nothing Nothing (Just now) mempty)
       (codec.encode e)
 
 -- | Like 'codecEventStoreWriter' but uses a 'TypeEmbedding' instead of
