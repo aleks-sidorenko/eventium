@@ -28,9 +28,6 @@
           "eventium-sql-common"
           "eventium-sqlite"
           "eventium-testkit"
-          "examples/bank"
-          "examples/cafe"
-          "examples/counter-cli"
         ];
 
         # Function to build a single package
@@ -113,15 +110,6 @@
         apps = {
           default = flake-utils.lib.mkApp {
             drv = packages.eventium-core;
-          };
-
-          # Example apps
-          bank-example = flake-utils.lib.mkApp {
-            drv = packages.examples-bank;
-          };
-
-          counter-cli = flake-utils.lib.mkApp {
-            drv = packages.examples-counter-cli;
           };
         };
       }

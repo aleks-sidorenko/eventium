@@ -5,9 +5,6 @@ packages:
   eventium-sql-common
   eventium-sqlite
   eventium-testkit
-  examples/cafe
-  examples/bank
-  examples/counter-cli
 
 -- Allow newer versions of dependencies
 allow-newer: true 
