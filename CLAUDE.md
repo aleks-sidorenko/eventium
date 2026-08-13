@@ -27,7 +27,6 @@ cabal test eventium-core
 cabal test eventium-memory
 cabal test eventium-postgresql
 cabal test eventium-sqlite
-cabal test examples-bank
 ```
 
 **PostgreSQL tests** require a running Postgres instance. Use `docker compose up -d` to start one. Tests use these env vars (with defaults matching docker-compose.yaml):
@@ -62,7 +61,7 @@ Multi-package cabal project (`cabal.project`):
 - **eventium-postgresql** — PostgreSQL backend via `persistent`/`persistent-postgresql`.
 - **eventium-sqlite** — SQLite backend via `persistent`/`persistent-sqlite`.
 - **eventium-testkit** — Shared hspec test utilities used across all packages.
-- **examples/{bank,cafe,counter-cli}** — Example applications demonstrating aggregates, command handlers, process managers, and read models. The bank example includes a Transfer ReadModel demonstrating queryable persistent views.
+- **Example applications** live in a separate repo, [eventium-hs/examples](https://github.com/eventium-hs/examples) (bank, cafe, counter-cli) — demonstrating aggregates, command handlers, process managers, and read models. The bank example includes a Transfer ReadModel demonstrating queryable persistent views.
 
 ## Testing Conventions
 

@@ -76,32 +76,13 @@ main = do
 
 ## Examples
 
-Working examples demonstrate increasing complexity:
+Working examples live in a separate repository,
+[eventium-hs/examples](https://github.com/eventium-hs/examples), demonstrating
+increasing complexity:
 
-### Counter CLI (`examples/counter-cli/`)
-
-Minimal single-file example: bounded counter with in-memory store.
-
-```bash
-cabal run counter-cli
-```
-
-### Cafe (`examples/cafe/`)
-
-Restaurant ordering system (inspired by [Edument's CQRS tutorial](http://cqrs.nu/tutorial)): tab management, chef todo list as a polling read model.
-
-```bash
-cabal run cafe-main -- --help
-cabal run cafe-chef-todo-main -- --database-path cafe.db
-```
-
-### Bank (`examples/bank/`)
-
-Full CQRS application: accounts, customers, money transfers via process manager, read models, event publishing.
-
-```bash
-cabal run bank-main -- --help
-```
+- **Counter CLI** — minimal single-file example: bounded counter with in-memory store.
+- **Cafe** — restaurant ordering system (inspired by [Edument's CQRS tutorial](http://cqrs.nu/tutorial)): tab management, chef todo list as a polling read model.
+- **Bank** — full CQRS application: accounts, customers, money transfers via process manager, read models, event publishing.
 
 ## Build System
 
@@ -121,7 +102,7 @@ PostgreSQL tests require a running instance (`docker compose up -d`). See [CLAUD
 
 - [Architecture](./docs/architecture.md) -- Architecture and design decisions
 - [Changelog](CHANGELOG.md) -- Version history
-- [Examples](examples/) -- Working applications
+- [Examples](https://github.com/eventium-hs/examples) -- Working applications
 
 ## License
 
