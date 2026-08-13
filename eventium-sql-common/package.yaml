@@ -13,7 +13,7 @@ category: Database,Eventsourcing
 license: MIT
 license-file: LICENSE.md
 
-github: aleks-sidorenko/eventium
+github: eventium-hs/eventium
 
 flags:
   ci:
