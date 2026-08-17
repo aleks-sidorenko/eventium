@@ -1,5 +1,10 @@
 # eventium-core Changelog
 
+## 0.6.1
+
+- Raise `base` lower bound to `>= 4.20` (GHC 9.10) to match the supported toolchain. Fixes a Hackage build failure where `foldl'` was not in scope on older `base` versions.
+- Add `homepage: https://eventium.dev`.
+
 ## 0.2.1 (Unreleased)
 
 ### Additions

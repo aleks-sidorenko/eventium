@@ -1,5 +1,5 @@
 name: eventium-sqlite
-version: "0.6.0"
+version: "0.6.1"
 maintainer: Alexander Sidorenko
 synopsis: SQLite implementations for eventium
 description: |
@@ -13,6 +13,7 @@ category: Database,Eventsourcing,SQLite
 license: MIT
 license-file: LICENSE.md
 
+homepage: https://eventium.dev
 github: eventium-hs/eventium
 
 extra-source-files:
@@ -30,9 +31,9 @@ when:
     ghc-options: -Werror
 
 dependencies:
-  - base >= 4.9 && < 5
-  - eventium-core >= 0.6.0 && < 0.7.0
-  - eventium-sql-common >= 0.6.0 && < 0.7.0
+  - base >= 4.20 && < 5
+  - eventium-core >= 0.6.1 && < 0.7.0
+  - eventium-sql-common >= 0.6.1 && < 0.7.0
 
   - aeson >= 1.5 && < 2.3
   - bytestring >= 0.10 && < 0.13
