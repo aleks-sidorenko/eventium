@@ -1,5 +1,10 @@
 # eventium-sqlite Changelog
 
+## 0.6.1
+
+- Raise `base` lower bound to `>= 4.20` (GHC 9.10) to match the supported toolchain.
+- Add `homepage: https://eventium.dev`.
+
 ## 0.2.1 (Unreleased)
 
 - `sqliteCheckpointStore` -- SQLite-backed `CheckpointStore` for `SequenceNumber` tracking.
