@@ -2,10 +2,16 @@
 
 module Eventium.ProcessManagerSpec (spec) where
 
+import Control.Concurrent.STM
 import Data.IORef
+import qualified Data.Map.Strict as Map
+import Data.Maybe (isJust)
+import Eventium.EventHandler (EventHandler (..))
 import Eventium.ProcessManager
 import Eventium.Projection
+import Eventium.ProjectionCache.Memory (tvarProjectionCache)
 import Eventium.Store.Class
+import Eventium.Store.Memory (emptyEventMap, tvarGlobalEventStoreReader)
 import Eventium.UUID
 import Test.Hspec
 
@@ -71,6 +77,26 @@ spec = do
             ]
           finalState = latestProjection proj events
       finalState.pendingTransfers `shouldBe` [(target, 30), (target, 50)]
+
+  describe "cachedProcessManagerEventHandler" $ do
+    it "dispatches effects and advances the snapshot cache" $ do
+      eventsTVar <- newTVarIO emptyEventMap
+      cacheTVar <- newTVarIO Map.empty
+      dispatchedTVar <- newTVarIO ([] :: [(UUID, TestCommand)])
+      let reader = tvarGlobalEventStoreReader eventsTVar
+          cache = tvarProjectionCache cacheTVar
+          dispatcher =
+            fireAndForgetDispatcher $ \uuid cmd ->
+              modifyTVar' dispatchedTVar (++ [(uuid, cmd)])
+          handler = cachedProcessManagerEventHandler testProcessManager reader cache dispatcher
+          target = uuidFromInteger 2
+          event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50)
+      atomically $ case handler of EventHandler f -> f event
+      dispatched <- readTVarIO dispatchedTVar
+      dispatched `shouldBe` [(target, AcceptCredit 50)]
+      -- The handler persisted a snapshot for the global projection (key = ()).
+      snap <- readTVarIO cacheTVar
+      Map.lookup () snap `shouldSatisfy` isJust
 
   describe "runProcessManagerEffects" $ do
     it "should dispatch commands via the dispatch function" $ do

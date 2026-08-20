@@ -22,6 +22,7 @@ module Eventium.ProcessManager
     fireAndForgetDispatcher,
     runProcessManagerEffects,
     processManagerEventHandler,
+    cachedProcessManagerEventHandler,
   )
 where
 
@@ -30,6 +31,8 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
+import Eventium.ProjectionCache.Cache (getLatestGlobalProjectionWithCache)
+import Eventium.ProjectionCache.Types (GlobalProjectionCache, ProjectionCache (..))
 import Eventium.Store.Class (GlobalEventStoreReader, VersionedStreamEvent)
 import Eventium.Store.Types (MetadataEnricher)
 import Eventium.UUID
@@ -147,5 +150,34 @@ processManagerEventHandler ::
 processManagerEventHandler pm globalReader dispatcher = EventHandler $ \event -> do
   let globalProj = globalStreamProjection pm.projection
   sp <- getLatestStreamProjection globalReader globalProj
+  let effects = pm.react sp.state event
+  runProcessManagerEffects dispatcher effects
+
+-- | Like 'processManagerEventHandler', but reads and advances the process
+-- manager's global projection through a 'GlobalProjectionCache' instead of
+-- replaying the entire global stream on every event.
+--
+-- For each event it loads the last snapshot and folds only the events written
+-- since it (via 'getLatestGlobalProjectionWithCache'), then persists the
+-- advanced snapshot. Cost is O(events since the snapshot) per call rather than
+-- O(total store size), so write-path latency no longer grows with the event
+-- log. Wire the same 'GlobalProjectionCache' into a startup catch-up if you want
+-- to avoid a one-time full fold on the first event after the cache is empty.
+--
+-- Correctness matches the uncached handler when the cache commits atomically
+-- with the write (e.g. a SQL-backed cache in the write transaction): the
+-- snapshot advances iff the events do. Generic over event, command, state and
+-- backend — the 'GlobalProjectionCache' abstracts persistence.
+cachedProcessManagerEventHandler ::
+  (Monad m) =>
+  ProcessManager state event command ->
+  GlobalEventStoreReader m event ->
+  GlobalProjectionCache state m ->
+  CommandDispatcher m command ->
+  EventHandler m (VersionedStreamEvent event)
+cachedProcessManagerEventHandler pm globalReader cache dispatcher = EventHandler $ \event -> do
+  let globalProj = globalStreamProjection pm.projection
+  sp <- getLatestGlobalProjectionWithCache globalReader cache globalProj
+  cache.storeSnapshot () sp.position sp.state
   let effects = pm.react sp.state event
   runProcessManagerEffects dispatcher effects

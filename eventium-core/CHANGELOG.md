@@ -1,5 +1,18 @@
 # eventium-core Changelog
 
+## 0.6.2
+
+### Additions
+
+- `cachedProcessManagerEventHandler` -- like `processManagerEventHandler`, but
+  reads and advances the process manager's global projection through a
+  `GlobalProjectionCache` instead of replaying the entire global stream on every
+  event. Each event folds only the events written since the last snapshot, so
+  write-path latency no longer grows with the size of the event log. Correctness
+  matches the uncached handler when the cache commits atomically with the write
+  (e.g. a SQL-backed cache in the write transaction). Generic over event,
+  command, state, and backend.
+
 ## 0.6.1
 
 - Raise `base` lower bound to `>= 4.20` (GHC 9.10) to match the supported toolchain. Fixes a Hackage build failure where `foldl'` was not in scope on older `base` versions.
