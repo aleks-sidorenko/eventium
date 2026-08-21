@@ -21,7 +21,7 @@ import Eventium.UUID (UUID)
 postgresqlVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
+  ProjectionCache UUID EventVersion (SqlPersistT m) JSONString
 postgresqlVersionedProjectionCache = sqlVersionedProjectionCache
 
 -- | PostgreSQL-backed 'ProjectionCache' for global blob snapshots.
@@ -29,7 +29,7 @@ postgresqlVersionedProjectionCache = sqlVersionedProjectionCache
 postgresqlGlobalProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
+  ProjectionCache () SequenceNumber (SqlPersistT m) JSONString
 postgresqlGlobalProjectionCache = sqlGlobalProjectionCache
 
 -- | PostgreSQL-backed 'CheckpointStore' for tracking subscription position.

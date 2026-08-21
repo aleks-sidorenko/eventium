@@ -172,7 +172,7 @@ cachedProcessManagerEventHandler ::
   (Monad m) =>
   ProcessManager state event command ->
   GlobalEventStoreReader m event ->
-  GlobalProjectionCache state m ->
+  GlobalProjectionCache m state ->
   CommandDispatcher m command ->
   EventHandler m (VersionedStreamEvent event)
 cachedProcessManagerEventHandler pm globalReader cache dispatcher = EventHandler $ \event -> do

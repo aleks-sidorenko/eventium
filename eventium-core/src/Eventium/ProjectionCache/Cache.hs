@@ -23,8 +23,8 @@ import Eventium.Store.Class
 -- cache in another 'Monad' while forgetting the original 'Monad'.
 runProjectionCacheUsing ::
   (forall a. mstore a -> m a) ->
-  ProjectionCache key position encoded mstore ->
-  ProjectionCache key position encoded m
+  ProjectionCache key position mstore encoded ->
+  ProjectionCache key position m encoded
 runProjectionCacheUsing runCache pc =
   ProjectionCache
     { storeSnapshot = \uuid version st -> runCache $ pc.storeSnapshot uuid version st,
@@ -37,8 +37,8 @@ runProjectionCacheUsing runCache pc =
 codecProjectionCache ::
   (Monad m) =>
   Codec state encoded ->
-  ProjectionCache key position encoded m ->
-  ProjectionCache key position state m
+  ProjectionCache key position m encoded ->
+  ProjectionCache key position m state
 codecProjectionCache codec pc =
   ProjectionCache storeSnapshot' loadSnapshot'
   where
@@ -52,7 +52,7 @@ codecProjectionCache codec pc =
 getLatestVersionedProjectionWithCache ::
   (Monad m) =>
   VersionedEventStoreReader m event ->
-  VersionedProjectionCache state m ->
+  VersionedProjectionCache m state ->
   VersionedStreamProjection state event ->
   m (VersionedStreamProjection state event)
 getLatestVersionedProjectionWithCache store cache proj =
@@ -63,7 +63,7 @@ getLatestVersionedProjectionWithCache store cache proj =
 getLatestGlobalProjectionWithCache ::
   (Monad m) =>
   GlobalEventStoreReader m event ->
-  GlobalProjectionCache state m ->
+  GlobalProjectionCache m state ->
   GlobalStreamProjection state event ->
   m (GlobalStreamProjection state event)
 getLatestGlobalProjectionWithCache store cache proj =
@@ -71,7 +71,7 @@ getLatestGlobalProjectionWithCache store cache proj =
 
 getLatestProjectionWithCache' ::
   (Monad m, Ord position) =>
-  ProjectionCache key position state m ->
+  ProjectionCache key position m state ->
   StreamProjection projKey position state event ->
   key ->
   m (StreamProjection projKey position state event)
@@ -92,7 +92,7 @@ getLatestProjectionWithCache' cache proj k = do
 updateVersionedProjectionCache ::
   (Monad m) =>
   VersionedEventStoreReader m event ->
-  VersionedProjectionCache state m ->
+  VersionedProjectionCache m state ->
   VersionedStreamProjection state event ->
   m ()
 updateVersionedProjectionCache reader cache proj = do
@@ -103,7 +103,7 @@ updateVersionedProjectionCache reader cache proj = do
 updateGlobalProjectionCache ::
   (Monad m) =>
   GlobalEventStoreReader m event ->
-  GlobalProjectionCache state m ->
+  GlobalProjectionCache m state ->
   GlobalStreamProjection state event ->
   m ()
 updateGlobalProjectionCache reader cache proj = do
@@ -117,7 +117,7 @@ updateGlobalProjectionCache reader cache proj = do
 snapshotEventHandler ::
   (Monad m) =>
   VersionedEventStoreReader m event ->
-  VersionedProjectionCache state m ->
+  VersionedProjectionCache m state ->
   Projection state event ->
   EventHandler m (VersionedStreamEvent event)
 snapshotEventHandler reader cache proj =
@@ -132,7 +132,7 @@ snapshotEventHandler reader cache proj =
 snapshotGlobalEventHandler ::
   (Monad m) =>
   GlobalEventStoreReader m event ->
-  GlobalProjectionCache state m ->
+  GlobalProjectionCache m state ->
   Projection state (VersionedStreamEvent event) ->
   EventHandler m (GlobalStreamEvent event)
 snapshotGlobalEventHandler reader cache proj =

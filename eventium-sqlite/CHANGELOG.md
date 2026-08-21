@@ -1,5 +1,14 @@
 # eventium-sqlite Changelog
 
+## 0.7.0
+
+### Breaking changes
+
+- `ProjectionCache` type parameters reordered to put the monad before the payload
+  (`ProjectionCache key position m encoded`; `GlobalProjectionCache m encoded`,
+  `VersionedProjectionCache m encoded`), following the `eventium-core` change —
+  behaviour unchanged, update explicit type signatures.
+
 ## 0.6.1
 
 - Raise `base` lower bound to `>= 4.20` (GHC 9.10) to match the supported toolchain.

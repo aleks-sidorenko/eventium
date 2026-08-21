@@ -78,7 +78,7 @@ applyCommandHandlerWithCache ::
   (Monad m) =>
   VersionedEventStoreWriter m event ->
   VersionedEventStoreReader m event ->
-  VersionedProjectionCache state m ->
+  VersionedProjectionCache m state ->
   CommandHandler state event command err ->
   UUID ->
   command ->

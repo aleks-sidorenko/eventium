@@ -23,7 +23,7 @@ import Eventium.UUID (UUID)
 sqliteVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
+  ProjectionCache UUID EventVersion (SqlPersistT m) JSONString
 sqliteVersionedProjectionCache = sqlVersionedProjectionCache
 
 -- | SQLite-backed 'ProjectionCache' for global blob snapshots.
@@ -31,7 +31,7 @@ sqliteVersionedProjectionCache = sqlVersionedProjectionCache
 sqliteGlobalProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
+  ProjectionCache () SequenceNumber (SqlPersistT m) JSONString
 sqliteGlobalProjectionCache = sqlGlobalProjectionCache
 
 -- | SQLite-backed 'CheckpointStore' for tracking subscription position.

@@ -348,7 +348,7 @@ newtype VersionedProjectionCacheRunner m
       ( forall a.
         ( VersionedEventStoreWriter m CounterEvent ->
           VersionedEventStoreReader m CounterEvent ->
-          VersionedProjectionCache Counter m ->
+          VersionedProjectionCache m Counter ->
           m a
         ) ->
         IO a
@@ -388,7 +388,7 @@ newtype GlobalProjectionCacheRunner m
       ( forall a.
         ( VersionedEventStoreWriter m CounterEvent ->
           GlobalEventStoreReader m CounterEvent ->
-          GlobalProjectionCache Counter m ->
+          GlobalProjectionCache m Counter ->
           m a
         ) ->
         IO a

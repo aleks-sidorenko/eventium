@@ -1,6 +1,16 @@
 # eventium-core Changelog
 
-## 0.6.2
+## 0.7.0
+
+### Breaking changes
+
+- `ProjectionCache` type parameters reordered from
+  `ProjectionCache key position encoded m` to `ProjectionCache key position m encoded`
+  (and the `VersionedProjectionCache` / `GlobalProjectionCache` synonyms from
+  `<encoded> <m>` to `<m> <encoded>`), so the monad sits before the payload —
+  consistent with `EventStoreReader` / `EventStoreWriter` and the rest of the
+  library. Update any explicit `ProjectionCache` / `*ProjectionCache` type
+  signatures accordingly; behaviour is unchanged.
 
 ### Additions
 
