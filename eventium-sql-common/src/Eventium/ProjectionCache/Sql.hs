@@ -75,7 +75,7 @@ ProjectionSnapshotEntity sql=projection_snapshots
 sqlVersionedProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache UUID EventVersion JSONString (SqlPersistT m)
+  ProjectionCache UUID EventVersion (SqlPersistT m) JSONString
 sqlVersionedProjectionCache name =
   ProjectionCache
     { storeSnapshot = \uuid (EventVersion ver) state -> do
@@ -103,7 +103,7 @@ sqlVersionedProjectionCache name =
 sqlGlobalProjectionCache ::
   (MonadIO m) =>
   ProjectionName ->
-  ProjectionCache () SequenceNumber JSONString (SqlPersistT m)
+  ProjectionCache () SequenceNumber (SqlPersistT m) JSONString
 sqlGlobalProjectionCache name =
   ProjectionCache
     { storeSnapshot = \() (SequenceNumber sn) state -> do

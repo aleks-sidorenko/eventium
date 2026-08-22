@@ -20,7 +20,7 @@ import Eventium.UUID
 -- The @key@ and @position@ type parameters are polymorphic so we can abstract
 -- over a cache for individual event streams, and a cache for globally ordered
 -- streams.
-data ProjectionCache key position encoded m
+data ProjectionCache key position m encoded
   = ProjectionCache
   { -- | Stores the state for a projection at a given @key@ and @position@.
     -- This is pretty unsafe, because there is no guarantee what is stored is
@@ -32,7 +32,7 @@ data ProjectionCache key position encoded m
   }
 
 -- | Type synonym for a 'ProjectionCache' used on individual event streams.
-type VersionedProjectionCache encoded m = ProjectionCache UUID EventVersion encoded m
+type VersionedProjectionCache m encoded = ProjectionCache UUID EventVersion m encoded
 
 -- | Type synonym for a 'ProjectionCache' that is used in conjunction with a
 -- 'GlobalStreamEventStore'. The key is fixed to @()@ (singleton) because
@@ -41,4 +41,4 @@ type VersionedProjectionCache encoded m = ProjectionCache UUID EventVersion enco
 -- The original @eventful@ library kept the key polymorphic
 -- (@GloballyOrderedProjectionCache key serialized m@), but that is redundant
 -- when each cache instance is already scoped by name.
-type GlobalProjectionCache encoded m = ProjectionCache () SequenceNumber encoded m
+type GlobalProjectionCache m encoded = ProjectionCache () SequenceNumber m encoded

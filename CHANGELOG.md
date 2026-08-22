@@ -1,5 +1,23 @@
 # eventium Changelog
 
+## 0.7.0
+
+### Breaking changes
+
+- `ProjectionCache` type parameters reordered to put the monad before the payload
+  (`ProjectionCache key position m encoded`; synonyms `VersionedProjectionCache m encoded`,
+  `GlobalProjectionCache m encoded`), consistent with `EventStoreReader` /
+  `EventStoreWriter`. Affects `eventium-core`, `eventium-sql-common`,
+  `eventium-postgresql`, `eventium-sqlite`, `eventium-memory`, `eventium-testkit`.
+  Behaviour is unchanged; update explicit type signatures.
+
+### Added
+
+- `cachedProcessManagerEventHandler` (`eventium-core`) -- snapshot-cached saga
+  projection: folds only events written since the last snapshot instead of
+  replaying the whole global stream on every event, so synchronous write-path
+  saga projection no longer degrades with the event-log size.
+
 ## 0.6.0
 
 ### Added

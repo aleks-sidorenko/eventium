@@ -38,7 +38,7 @@ storeProjectionInMap uuid version state = Map.insert uuid (version, state)
 tvarProjectionCache ::
   (Ord key) =>
   TVar (ProjectionMap key position encoded) ->
-  ProjectionCache key position encoded STM
+  ProjectionCache key position STM encoded
 tvarProjectionCache tvar =
   ProjectionCache
     { storeSnapshot = \uuid version projState -> modifyTVar' tvar (storeProjectionInMap uuid version projState),
@@ -50,7 +50,7 @@ embeddedStateProjectionCache ::
   (MonadState s m, Ord key) =>
   (s -> ProjectionMap key position encoded) ->
   (s -> ProjectionMap key position encoded -> s) ->
-  ProjectionCache key position encoded m
+  ProjectionCache key position m encoded
 embeddedStateProjectionCache getMap setMap =
   ProjectionCache
     { storeSnapshot = \uuid version projState -> modify' (storeSnapshot uuid version projState),
