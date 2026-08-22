@@ -16,7 +16,13 @@
 - `cachedProcessManagerEventHandler` (`eventium-core`) -- snapshot-cached saga
   projection: folds only events written since the last snapshot instead of
   replaying the whole global stream on every event, so synchronous write-path
-  saga projection no longer degrades with the event-log size.
+  saga projection no longer degrades with the event-log size. Takes a relevance
+  predicate on the domain event: events it rejects are skipped before any cache
+  access, so a saga pays no snapshot read/fold/store for event types it does not
+  react to (pass `const True` to react to everything). This matters when a single
+  write appends many events a saga ignores — e.g. a configuration change
+  relocalizing dozens of dictionary entries would otherwise drive every saga once
+  per event, `O(ignored events x round-trips)` of wasted write-path latency.
 
 ## 0.6.0
 
