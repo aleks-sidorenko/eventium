@@ -1,5 +1,29 @@
 # eventium Changelog
 
+## 0.7.1
+
+### Breaking changes
+
+- `cachedProcessManagerEventHandler` (`eventium-core`) now takes a **relevance
+  predicate** `(event -> Bool)` as its first argument. Events the predicate
+  rejects are skipped before any projection-cache access, so a saga pays no
+  snapshot read/fold/store for event types it does not react to. Pass
+  `const True` to restore the previous (react-to-everything) behaviour.
+
+  Motivation: the synchronous write-path publisher delivers every persisted
+  event to every process manager, and the cached handler does snapshot read +
+  delta fold + snapshot write per event. A single write that appends many events
+  a saga ignores — e.g. a configuration change relocalizing dozens of dictionary
+  entries — costs `O(ignored events x round-trips)` of wasted latency in the
+  write transaction, which dominates against a remote database. The predicate
+  lets each saga declare the event types it acts on so irrelevant events
+  short-circuit with zero I/O.
+
+  The snapshot advances only on accepted events; the next accepted event folds
+  the (now larger) delta. State stays correct — the projection still observes
+  every event when it runs — and the fold cost moves off the ignored-batch
+  write path.
+
 ## 0.7.0
 
 ### Breaking changes
@@ -16,13 +40,7 @@
 - `cachedProcessManagerEventHandler` (`eventium-core`) -- snapshot-cached saga
   projection: folds only events written since the last snapshot instead of
   replaying the whole global stream on every event, so synchronous write-path
-  saga projection no longer degrades with the event-log size. Takes a relevance
-  predicate on the domain event: events it rejects are skipped before any cache
-  access, so a saga pays no snapshot read/fold/store for event types it does not
-  react to (pass `const True` to react to everything). This matters when a single
-  write appends many events a saga ignores — e.g. a configuration change
-  relocalizing dozens of dictionary entries would otherwise drive every saga once
-  per event, `O(ignored events x round-trips)` of wasted write-path latency.
+  saga projection no longer degrades with the event-log size.
 
 ## 0.6.0
 
