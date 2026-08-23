@@ -88,13 +88,55 @@ spec = do
           dispatcher =
             fireAndForgetDispatcher $ \uuid cmd ->
               modifyTVar' dispatchedTVar (++ [(uuid, cmd)])
-          handler = cachedProcessManagerEventHandler testProcessManager reader cache dispatcher
+          handler = cachedProcessManagerEventHandler (const True) testProcessManager reader cache dispatcher
           target = uuidFromInteger 2
           event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50)
       atomically $ case handler of EventHandler f -> f event
       dispatched <- readTVarIO dispatchedTVar
       dispatched `shouldBe` [(target, AcceptCredit 50)]
       -- The handler persisted a snapshot for the global projection (key = ()).
+      snap <- readTVarIO cacheTVar
+      Map.lookup () snap `shouldSatisfy` isJust
+
+    it "skips snapshot I/O and dispatch for events the relevance predicate rejects" $ do
+      eventsTVar <- newTVarIO emptyEventMap
+      cacheTVar <- newTVarIO Map.empty
+      dispatchedTVar <- newTVarIO ([] :: [(UUID, TestCommand)])
+      let reader = tvarGlobalEventStoreReader eventsTVar
+          cache = tvarProjectionCache cacheTVar
+          dispatcher =
+            fireAndForgetDispatcher $ \uuid cmd ->
+              modifyTVar' dispatchedTVar (++ [(uuid, cmd)])
+          isTransfer e = case e of TransferInitiated {} -> True; _ -> False
+          handler =
+            cachedProcessManagerEventHandler isTransfer testProcessManager reader cache dispatcher
+          -- A Credited event: rejected by the predicate even though react/projection
+          -- would otherwise touch it.
+          event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (Credited 100)
+      atomically $ case handler of EventHandler f -> f event
+      dispatched <- readTVarIO dispatchedTVar
+      dispatched `shouldBe` []
+      -- No snapshot was read or written for a rejected event.
+      snap <- readTVarIO cacheTVar
+      Map.lookup () snap `shouldBe` Nothing
+
+    it "processes events the relevance predicate accepts, advancing the snapshot cache" $ do
+      eventsTVar <- newTVarIO emptyEventMap
+      cacheTVar <- newTVarIO Map.empty
+      dispatchedTVar <- newTVarIO ([] :: [(UUID, TestCommand)])
+      let reader = tvarGlobalEventStoreReader eventsTVar
+          cache = tvarProjectionCache cacheTVar
+          dispatcher =
+            fireAndForgetDispatcher $ \uuid cmd ->
+              modifyTVar' dispatchedTVar (++ [(uuid, cmd)])
+          isTransfer e = case e of TransferInitiated {} -> True; _ -> False
+          handler =
+            cachedProcessManagerEventHandler isTransfer testProcessManager reader cache dispatcher
+          target = uuidFromInteger 2
+          event = StreamEvent (uuidFromInteger 1) 0 (emptyMetadata "") (TransferInitiated target 50)
+      atomically $ case handler of EventHandler f -> f event
+      dispatched <- readTVarIO dispatchedTVar
+      dispatched `shouldBe` [(target, AcceptCredit 50)]
       snap <- readTVarIO cacheTVar
       Map.lookup () snap `shouldSatisfy` isJust
 

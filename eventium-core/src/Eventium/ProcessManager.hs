@@ -26,14 +26,14 @@ module Eventium.ProcessManager
   )
 where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.String (IsString)
 import Data.Text (Text)
 import Eventium.EventHandler (EventHandler (..))
 import Eventium.Projection
 import Eventium.ProjectionCache.Cache (getLatestGlobalProjectionWithCache)
 import Eventium.ProjectionCache.Types (GlobalProjectionCache, ProjectionCache (..))
-import Eventium.Store.Class (GlobalEventStoreReader, VersionedStreamEvent)
+import Eventium.Store.Class (GlobalEventStoreReader, StreamEvent (..), VersionedStreamEvent)
 import Eventium.Store.Types (MetadataEnricher)
 import Eventium.UUID
 
@@ -157,27 +157,50 @@ processManagerEventHandler pm globalReader dispatcher = EventHandler $ \event ->
 -- manager's global projection through a 'GlobalProjectionCache' instead of
 -- replaying the entire global stream on every event.
 --
--- For each event it loads the last snapshot and folds only the events written
--- since it (via 'getLatestGlobalProjectionWithCache'), then persists the
+-- For each /relevant/ event it loads the last snapshot and folds only the events
+-- written since it (via 'getLatestGlobalProjectionWithCache'), then persists the
 -- advanced snapshot. Cost is O(events since the snapshot) per call rather than
 -- O(total store size), so write-path latency no longer grows with the event
 -- log. Wire the same 'GlobalProjectionCache' into a startup catch-up if you want
 -- to avoid a one-time full fold on the first event after the cache is empty.
 --
+-- __Relevance predicate.__ A process manager reacts to a known subset of the
+-- global event stream, yet the write-path publisher delivers /every/ persisted
+-- event to /every/ process manager. Without a filter, an event a saga ignores
+-- still costs a snapshot read, a delta fold, and a snapshot re-store — pure I/O
+-- for no effect. On a batch of ignored events (e.g. a configuration change
+-- appending dozens of events) that is @O(ignored events x round-trips)@ of
+-- wasted latency in the write transaction, which dominates against a remote
+-- database. The predicate runs on the domain event ('payload') /before/ any
+-- cache access, so rejected events cost nothing. Supply a predicate that is
+-- @True@ for exactly the event types the saga's 'react' can act on — a superset
+-- is safe (it only forgoes the optimisation), and @const True@ recovers the
+-- unfiltered behaviour for a saga that genuinely reacts to everything.
+--
 -- Correctness matches the uncached handler when the cache commits atomically
 -- with the write (e.g. a SQL-backed cache in the write transaction): the
--- snapshot advances iff the events do. Generic over event, command, state and
--- backend — the 'GlobalProjectionCache' abstracts persistence.
+-- snapshot advances iff the events do. Because the snapshot advances only on
+-- accepted events, a run of rejected events leaves the checkpoint behind and the
+-- next accepted event folds the (now larger) delta — an intended trade: the
+-- projection still observes every event when it runs, so state stays correct,
+-- and the fold cost is paid lazily by the next relevant event rather than
+-- eagerly in the write path of the ignored batch. Generic over event, command,
+-- state and backend — the 'GlobalProjectionCache' abstracts persistence.
 cachedProcessManagerEventHandler ::
   (Monad m) =>
+  -- | Relevance predicate on the domain event; rejected events are skipped
+  -- before any cache I/O. Use @const True@ to react to every event.
+  (event -> Bool) ->
   ProcessManager state event command ->
   GlobalEventStoreReader m event ->
   GlobalProjectionCache m state ->
   CommandDispatcher m command ->
   EventHandler m (VersionedStreamEvent event)
-cachedProcessManagerEventHandler pm globalReader cache dispatcher = EventHandler $ \event -> do
-  let globalProj = globalStreamProjection pm.projection
-  sp <- getLatestGlobalProjectionWithCache globalReader cache globalProj
-  cache.storeSnapshot () sp.position sp.state
-  let effects = pm.react sp.state event
-  runProcessManagerEffects dispatcher effects
+cachedProcessManagerEventHandler relevant pm globalReader cache dispatcher =
+  EventHandler $ \event ->
+    when (relevant event.payload) $ do
+      let globalProj = globalStreamProjection pm.projection
+      sp <- getLatestGlobalProjectionWithCache globalReader cache globalProj
+      cache.storeSnapshot () sp.position sp.state
+      let effects = pm.react sp.state event
+      runProcessManagerEffects dispatcher effects
